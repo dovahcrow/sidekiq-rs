@@ -2,7 +2,7 @@ use random_choice::random_choice;
 use server::{Signal, Operation};
 use chan::{Sender, Receiver};
 use r2d2_redis::RedisConnectionManager;
-use r2d2::PooledConnection;
+use r2d2::Pool;
 use job::Job;
 use serde_json::from_str;
 use errors::*;
@@ -17,7 +17,7 @@ use chrono::UTC;
 pub struct SidekiqWorker {
     id: String,
     server_id: String,
-    conn: PooledConnection<RedisConnectionManager>,
+    pool: Pool<RedisConnectionManager>,
     namespace: Option<String>,
     queues: Vec<String>,
     weights: Vec<f64>,
@@ -28,7 +28,7 @@ pub struct SidekiqWorker {
 
 impl SidekiqWorker {
     pub fn new(server_id: &str,
-               conn: PooledConnection<RedisConnectionManager>,
+               pool: Pool<RedisConnectionManager>,
                tx: Sender<Signal>,
                rx: Receiver<Operation>,
                queues: Vec<String>,
@@ -39,7 +39,7 @@ impl SidekiqWorker {
         SidekiqWorker {
             id: ::rand::thread_rng().gen_ascii_chars().take(9).collect(),
             server_id: server_id.into(),
-            conn: conn,
+            pool: pool,
             namespace: namespace,
             queues: queues,
             weights: weights,
@@ -76,7 +76,7 @@ impl SidekiqWorker {
         let queue_name = self.queue_name(name);
         debug!("queue name '{}'", queue_name);
 
-        let result: Option<Vec<String>> = self.conn.brpop(&queue_name, 2)?;
+        let result: Option<Vec<String>> = self.pool.get()?.brpop(&queue_name, 2)?;
 
         if let Some(result) = result {
             let job: Job = from_str(&result[1])?;
@@ -108,16 +108,18 @@ impl SidekiqWorker {
             "payload" => parse(&to_string(job).unwrap()).unwrap(),
             "run_at" => UTC::now().timestamp()
         };
-        self.conn
+        self.pool
+            .get()?
             .hset(&self.with_namespace(&self.with_server_id("workers")),
                   &self.id,
                   payload.dump())?;
-        let _ = self.conn.expire(&self.with_namespace(&self.with_server_id("workers")), 5)?;
+        let _ = self.pool.get()?.expire(&self.with_namespace(&self.with_server_id("workers")), 5)?;
         Ok(())
     }
 
     fn report_done(&self) -> Result<()> {
-        self.conn
+        let _ = self.pool
+            .get()?
             .hdel(&self.with_namespace(&self.with_server_id("workers")),
                   &self.id)?;
         Ok(())

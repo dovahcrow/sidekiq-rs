@@ -37,7 +37,7 @@ pub struct SidekiqServer<'a> {
     started_at: f64,
     busy: usize,
     rs: String,
-    id: usize,
+    pid: usize,
     concurrency: usize,
 }
 
@@ -59,7 +59,7 @@ impl<'a> SidekiqServer<'a> {
             weights: vec![],
             started_at: now.timestamp() as f64 + now.timestamp_subsec_micros() as f64 / 1000000f64,
             busy: 0,
-            id: 1,
+            pid: 1,
             concurrency: concurrency,
             // random itentity
             rs: ::rand::thread_rng().gen_ascii_chars().take(12).collect(),
@@ -75,64 +75,6 @@ impl<'a> SidekiqServer<'a> {
         self.job_handler_factories.insert(name.into(), handle);
     }
 
-    fn report_alive(&mut self) -> Result<()> {
-        let now = UTC::now();
-        let content = vec![("info",
-                            object! {
-                                "hostname"=> rust_gethostname().unwrap_or("unknown".into()),
-                                "started_at"=> self.started_at,
-                                "pid"=> self.id,
-                                "concurrency"=> self.concurrency,
-                                "queues"=> self.queues.clone(),
-                                "labels"=> array![],
-                                "identity"=> self.identity()
-                            }
-                               .dump()),
-                           ("busy", self.busy.to_string()),
-                           ("beat",
-                            (now.timestamp() as f64 +
-                             now.timestamp_subsec_micros() as f64 / 1000000f64)
-                               .to_string())];
-
-        let _ = self.redispool
-            .get()
-            .unwrap()
-            .hset_multiple(self.with_namespace(&self.identity()), &content)?;
-        let _ = self.redispool.get().unwrap().expire(self.with_namespace(&self.identity()), 5)?;
-        let _ = self.redispool
-            .get()
-            .unwrap()
-            .sadd(self.with_namespace(&"processes"), self.identity())?;
-        Ok(())
-
-    }
-
-    fn processed_tasks(&mut self, n: usize) -> Result<()> {
-        let key = self.with_namespace(&format!("stat:processed:{}", UTC::now().format("%Y-%m-%d")));
-        let connection = self.redispool.get().unwrap();
-
-        let _ = connection.incr(key, n)?;
-        Ok(())
-    }
-
-    fn failed_tasks(&mut self, n: usize) -> Result<()> {
-        let key = self.with_namespace(&format!("stat:failed:{}", UTC::now().format("%Y-%m-%d")));
-        let connection = self.redispool.get().unwrap();
-
-        let _ = connection.incr(key, n)?;
-        Ok(())
-    }
-
-    fn identity(&self) -> String {
-        let host = rust_gethostname().unwrap_or("unknown".into());
-        let pid = self.id;
-
-        host + ":" + &pid.to_string() + ":" + &self.rs
-    }
-
-    fn with_namespace(&self, snippet: &str) -> String {
-        self.namespace.clone().map(|v| v + ":").unwrap_or("".into()) + snippet
-    }
 
     pub fn start(&mut self) {
         info!("sidekiq-rs is running...");
@@ -140,9 +82,8 @@ impl<'a> SidekiqServer<'a> {
         let (tox, rox) = sync(self.concurrency);
 
         for _ in 0..self.concurrency {
-            let conn = self.redispool.get().unwrap();
             let worker = SidekiqWorker::new(&self.identity(),
-                                            conn,
+                                            self.redispool.clone(),
                                             tsx.clone(),
                                             rox.clone(),
                                             self.queues.clone(),
@@ -166,13 +107,13 @@ impl<'a> SidekiqServer<'a> {
                     debug!("received signal {:?}", sig);
                     match sig {
                         Some(Signal::Complete(_, n)) => {
-                            let _ = self.processed_tasks(n);
+                            let _ = self.report_processed(n);
                             if self.busy != 0 {
                                 self.busy -= 1;
                             }
                         },
                         Some(Signal::Fail(_, n)) => {
-                            let _ = self.failed_tasks(n);
+                            let _ = self.report_failed(n);
                             if self.busy != 0 {
                                 self.busy -= 1;
                             }
@@ -186,5 +127,68 @@ impl<'a> SidekiqServer<'a> {
                 }
             }
         }
+    }
+
+    fn report_alive(&mut self) -> Result<()> {
+        let now = UTC::now();
+        let content = vec![("info",
+                            object! {
+                                "hostname"=> rust_gethostname().unwrap_or("unknown".into()),
+                                "started_at"=> self.started_at,
+                                "pid"=> self.pid,
+                                "concurrency"=> self.concurrency,
+                                "queues"=> self.queues.clone(),
+                                "labels"=> array![],
+                                "identity"=> self.identity()
+                            }
+                               .dump()),
+                           ("busy", self.busy.to_string()),
+                           ("beat",
+                            (now.timestamp() as f64 +
+                             now.timestamp_subsec_micros() as f64 / 1000000f64)
+                               .to_string())];
+
+        let _ = self.redispool
+            .get()
+            .unwrap()
+            .hset_multiple(self.with_namespace(&self.identity()), &content)?;
+        let _ = self.redispool.get().unwrap().expire(self.with_namespace(&self.identity()), 5)?;
+        let _ =
+            self.redispool.get().unwrap().sadd(self.with_namespace(&"processes"), self.identity())?;
+        Ok(())
+
+    }
+
+    fn report_processed(&mut self, n: usize) -> Result<()> {
+        let key = self.with_namespace(&format!("stat:processed:{}", UTC::now().format("%Y-%m-%d")));
+        let connection = self.redispool.get().unwrap();
+        let _ = connection.incr(key, n)?;
+
+        let key = self.with_namespace(&format!("stat:processed"));
+        let connection = self.redispool.get().unwrap();
+        let _ = connection.incr(key, n)?;
+        Ok(())
+    }
+
+    fn report_failed(&mut self, n: usize) -> Result<()> {
+        let key = self.with_namespace(&format!("stat:failed:{}", UTC::now().format("%Y-%m-%d")));
+        let connection = self.redispool.get().unwrap();
+        let _ = connection.incr(key, n)?;
+
+        let key = self.with_namespace(&format!("stat:failed"));
+        let connection = self.redispool.get().unwrap();
+        let _ = connection.incr(key, n)?;
+        Ok(())
+    }
+
+    fn identity(&self) -> String {
+        let host = rust_gethostname().unwrap_or("unknown".into());
+        let pid = self.pid;
+
+        host + ":" + &pid.to_string() + ":" + &self.rs
+    }
+
+    fn with_namespace(&self, snippet: &str) -> String {
+        self.namespace.clone().map(|v| v + ":").unwrap_or("".into()) + snippet
     }
 }

@@ -7,15 +7,13 @@ use std::time::Duration;
 use std::marker::Sync;
 
 
+#[derive(Debug)]
+pub struct JobHandlerError(Box<Error + Send>);
+
 impl Error for JobHandlerError {
     fn description(&self) -> &str {
-        &self.description
+        &self.0.description()
     }
-}
-
-#[derive(Debug)]
-pub struct JobHandlerError {
-    description: String,
 }
 
 impl Display for JobHandlerError {
@@ -24,30 +22,51 @@ impl Display for JobHandlerError {
     }
 }
 
+
 pub trait JobHandlerFactory {
     fn produce(&mut self) -> Box<JobHandler>;
-}
-
-pub struct DummyHandlerFactory;
-
-impl JobHandlerFactory for DummyHandlerFactory {
-    fn produce(&mut self) -> Box<JobHandler> {
-        Box::new(DummyHandler)
-    }
 }
 
 pub trait JobHandler: Send {
     fn handle(&mut self, job: &Job) -> Result<(), JobHandlerError>;
 }
 
-pub struct DummyHandler;
 
-unsafe impl Sync for DummyHandler {}
+pub struct PrinterHandlerFactory;
 
-impl JobHandler for DummyHandler {
+impl JobHandlerFactory for PrinterHandlerFactory {
+    fn produce(&mut self) -> Box<JobHandler> {
+        Box::new(PrinterHandler)
+    }
+}
+
+pub struct PrinterHandler;
+
+unsafe impl Sync for PrinterHandler {}
+
+impl JobHandler for PrinterHandler {
     fn handle(&mut self, job: &Job) -> Result<(), JobHandlerError> {
         info!("handling {}", job.class);
         thread::sleep(Duration::from_secs(2));
         Ok(())
+    }
+}
+
+
+pub struct ErrorHandlerFactory;
+
+impl JobHandlerFactory for ErrorHandlerFactory {
+    fn produce(&mut self) -> Box<JobHandler> {
+        Box::new(ErrorHandler)
+    }
+}
+
+pub struct ErrorHandler;
+
+unsafe impl Sync for ErrorHandler {}
+
+impl JobHandler for ErrorHandler {
+    fn handle(&mut self, job: &Job) -> Result<(), JobHandlerError> {
+        Err(JobHandlerError(Box::new("a".parse::<i8>().unwrap_err())))
     }
 }
