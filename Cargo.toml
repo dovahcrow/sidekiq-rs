@@ -1,7 +1,7 @@
 [package]
 authors = ["Wu Young <doomsplayer@gmail.com>"]
 name = "sidekiq-rs"
-version = "0.1.0"
+version = "0.1.1"
 license = "MIT"
 description = "Sidekiq compatible server in Rust"
 homepage = "https://github.com/doomsplayer/sidekiq-rs"
@@ -9,7 +9,7 @@ repository = "https://github.com/doomsplayer/sidekiq-rs"
 
 
 [lib]
-name = "sidekiqrs"
+name = "sidekiq"
 
 [dependencies]
 chan = "0.1.18"
