@@ -7,7 +7,7 @@ end
 
 require_relative 'lib/worker/dummy'
 require_relative 'lib/worker/printer'
-require_relative 'lib/worker/exception'
+require_relative 'lib/worker/error'
 
 
 
