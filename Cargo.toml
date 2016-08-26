@@ -1,7 +1,12 @@
 [package]
-authors = ["Dmitry Gritsay <dmitry@vinted.com>"]
-name = "rust_sidekiq"
+authors = ["Wu Young <doomsplayer@gmail.com>"]
+name = "sidekiq-rs"
 version = "0.1.0"
+license = "MIT"
+description = "Sidekiq compatible server in Rust"
+homepage = "https://github.com/doomsplayer/sidekiq-rs"
+repository = "https://github.com/doomsplayer/sidekiq-rs"
+
 
 [lib]
 name = "sidekiqrs"
@@ -26,17 +31,3 @@ serde = "0.8"
 serde_json = "0.8"
 serde_macros = "0.8"
 threadpool = "1.0.0"
-
-[dependencies.ruru]
-git = "https://github.com/doomsplayer/ruru"
-
-[profile]
-
-[profile.release]
-codegen-units = 1
-debug = true
-debug-assertions = false
-lto = false
-opt-level = 3
-panic = "unwind"
-rpath = false

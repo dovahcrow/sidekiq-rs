@@ -1,17 +1,10 @@
-use redis::Connection;
 use random_choice::random_choice;
 use server::{Signal, Operation};
 use chan::{Sender, Receiver};
 use r2d2_redis::RedisConnectionManager;
 use r2d2::PooledConnection;
 use job::Job;
-use serde_json::Value as JValue;
 use serde_json::from_str;
-
-use ruru::{AnyObject as RObject, Class as RClass, RString, Fixnum as RFixnum, NilClass as RNil,
-           Hash as RHash, Boolean as RBool, Array as RArray};
-use ruru::traits::Object;
-use ruru::VM;
 use errors::*;
 use redis::Commands;
 use std::collections::BTreeMap;
@@ -86,7 +79,7 @@ impl SidekiqWorker {
         let result: Option<Vec<String>> = self.conn.brpop(&queue_name, 2)?;
 
         if let Some(result) = result {
-            let mut job: Job = from_str(&result[1])?;
+            let job: Job = from_str(&result[1])?;
             self.tx.send(Signal::Acquire(self.id.clone()));
             self.report_working(&job)?;
             self.perform(&job)?;

@@ -1,3 +1,4 @@
+#![allow(unused_assignments)]
 use libc::{c_char, size_t, c_int};
 
 extern "C" {
@@ -14,6 +15,7 @@ pub fn rust_gethostname() -> Result<String, ()> {
 
     match err {
         0 => {
+
             let mut real_len = len;
             let mut i = 0;
             loop {

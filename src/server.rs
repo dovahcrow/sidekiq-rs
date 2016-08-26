@@ -13,7 +13,6 @@ use threadpool::ThreadPool;
 use worker::SidekiqWorker;
 use redis::Commands;
 
-use chan::async;
 use chan::sync;
 
 #[derive(Debug)]
@@ -63,7 +62,7 @@ impl<'a> SidekiqServer<'a> {
             id: 1,
             concurrency: concurrency,
             // random itentity
-            rs: ::rand::thread_rng().gen_ascii_chars().take(6).collect(),
+            rs: ::rand::thread_rng().gen_ascii_chars().take(12).collect(),
         }
     }
 

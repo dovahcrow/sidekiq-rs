@@ -1,5 +1,5 @@
 [root]
-name = "rust_sidekiq"
+name = "sidekiq-rs"
 version = "0.1.0"
 dependencies = [
  "chan 0.1.18 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -14,9 +14,8 @@ dependencies = [
  "r2d2 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "r2d2_redis 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.3.14 (registry+https://github.com/rust-lang/crates.io-index)",
- "random_choice 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "random_choice 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "redis 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "ruru 0.7.8 (git+https://github.com/doomsplayer/ruru)",
  "rustc-serialize 0.3.19 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde 0.8.4 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 0.8.1 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -274,7 +273,7 @@ dependencies = [
 
 [[package]]
 name = "random_choice"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "rand 0.3.14 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -305,22 +304,6 @@ dependencies = [
 name = "regex-syntax"
 version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-
-[[package]]
-name = "ruby-sys"
-version = "0.2.6"
-source = "git+https://github.com/doomsplayer/ruby-sys#985c50d14ed76966d11c72c91e9e231b158a6a7f"
-dependencies = [
- "libc 0.2.15 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "ruru"
-version = "0.7.8"
-source = "git+https://github.com/doomsplayer/ruru#53751601198c8650bf9c7fa51f4d8f840e3713fb"
-dependencies = [
- "ruby-sys 0.2.6 (git+https://github.com/doomsplayer/ruby-sys)",
-]
 
 [[package]]
 name = "rustc-demangle"
@@ -485,12 +468,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 "checksum r2d2 0.7.0 (registry+https://github.com/rust-lang/crates.io-index)" = "a63c7dd6655b3165145c5c140e8548ba2176a263682c07aaead2fe79eedd97bc"
 "checksum r2d2_redis 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)" = "98a9f572bf1cc3abe78a8d3c74ad4ba65c91790056832584d8b8fd6f6780292a"
 "checksum rand 0.3.14 (registry+https://github.com/rust-lang/crates.io-index)" = "2791d88c6defac799c3f20d74f094ca33b9332612d9aef9078519c82e4fe04a5"
-"checksum random_choice 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)" = "ddd392479b5786d2586cee7cd989544ecf620651b1fa254c6db4524b0f1e9007"
+"checksum random_choice 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)" = "45b8c280d4abb0092b6a354715548c1b261402d3531dfaddc2073e2882acb2da"
 "checksum redis 0.6.0 (registry+https://github.com/rust-lang/crates.io-index)" = "18d162896c106889eb50ecdedccf6b60ee639319d65828add5aaf6d17858992f"
 "checksum regex 0.1.73 (registry+https://github.com/rust-lang/crates.io-index)" = "56b7ee9f764ecf412c6e2fff779bca4b22980517ae335a21aeaf4e32625a5df2"
 "checksum regex-syntax 0.3.4 (registry+https://github.com/rust-lang/crates.io-index)" = "31040aad7470ad9d8c46302dcffba337bb4289ca5da2e3cd6e37b64109a85199"
-"checksum ruby-sys 0.2.6 (git+https://github.com/doomsplayer/ruby-sys)" = "<none>"
-"checksum ruru 0.7.8 (git+https://github.com/doomsplayer/ruru)" = "<none>"
 "checksum rustc-demangle 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)" = "c4c2d35b2ed94cec4fad26a36eee4d6eff394ce70a8ceea064b0b6ca42ea4cf0"
 "checksum rustc-serialize 0.3.19 (registry+https://github.com/rust-lang/crates.io-index)" = "6159e4e6e559c81bd706afe9c8fd68f547d3e851ce12e76b1de7914bab61691b"
 "checksum serde 0.8.4 (registry+https://github.com/rust-lang/crates.io-index)" = "b1dfda9ebb31d29fa8b94d7eb3031a86a8dcec065f0fe268a30f98867bf45775"
