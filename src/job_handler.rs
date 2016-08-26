@@ -66,7 +66,7 @@ pub struct ErrorHandler;
 unsafe impl Sync for ErrorHandler {}
 
 impl JobHandler for ErrorHandler {
-    fn handle(&mut self, job: &Job) -> Result<(), JobHandlerError> {
+    fn handle(&mut self, _: &Job) -> Result<(), JobHandlerError> {
         Err(JobHandlerError(Box::new("a".parse::<i8>().unwrap_err())))
     }
 }

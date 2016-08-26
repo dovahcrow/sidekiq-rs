@@ -38,10 +38,14 @@ fn main() {
         })
         .collect();
 
-    let mut handler = DummyHandlerFactory {};
+    let mut handler = PrinterHandlerFactory;
+    let mut handler2 = ErrorHandlerFactory;
+
     let mut server = SidekiqServer::new(&redis, concurrency);
 
     server.attach_handler_factory("Dummy", &mut handler);
+    server.attach_handler_factory("Error", &mut handler2);
+
     for (name, weight) in queues {
         server.new_queue(&name, weight);
     }

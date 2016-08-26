@@ -1,12 +1,9 @@
 require 'sidekiq'
 
-class Excep
+class Error
   include Sidekiq::Worker
   sidekiq_options :queue => :analytics
 
-  def perform(name)
-    p 1
-    raise name
-    p 2
+  def perform()
   end
 end
