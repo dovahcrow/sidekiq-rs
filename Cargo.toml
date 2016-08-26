@@ -1,18 +1,15 @@
 [package]
 authors = ["Wu Young <doomsplayer@gmail.com>"]
-name = "sidekiq-rs"
-version = "0.1.1"
-license = "MIT"
 description = "Sidekiq compatible server in Rust"
 homepage = "https://github.com/doomsplayer/sidekiq-rs"
+license = "MIT"
+name = "sidekiq-rs"
 repository = "https://github.com/doomsplayer/sidekiq-rs"
-
-
-[lib]
-name = "sidekiq"
+version = "0.1.1"
 
 [dependencies]
 chan = "0.1.18"
+chan-signal = "0.1.6"
 chrono = "0.2.25"
 docopt = "0.6.82"
 docopt_macros = "0.6.85"
@@ -31,3 +28,6 @@ serde = "0.8"
 serde_json = "0.8"
 serde_macros = "0.8"
 threadpool = "1.0.0"
+
+[lib]
+name = "sidekiq"

@@ -14,6 +14,7 @@ use worker::SidekiqWorker;
 use redis::Commands;
 
 use chan::sync;
+use chan_signal::{Signal as SysSignal, notify};
 
 #[derive(Debug)]
 pub enum Signal {
@@ -25,6 +26,7 @@ pub enum Signal {
 
 pub enum Operation {
     Run,
+    Terminate,
 }
 
 pub struct SidekiqServer<'a> {
@@ -80,7 +82,7 @@ impl<'a> SidekiqServer<'a> {
         info!("sidekiq-rs is running...");
         let (tsx, rsx) = sync(self.concurrency);
         let (tox, rox) = sync(self.concurrency);
-
+        let signal = notify(&[SysSignal::INT, SysSignal::USR1]);
         for _ in 0..self.concurrency {
             let worker = SidekiqWorker::new(&self.identity(),
                                             self.redispool.clone(),
@@ -99,9 +101,24 @@ impl<'a> SidekiqServer<'a> {
 
             self.threadpool.execute(move || worker.work());
         }
+        let term_func = || tox.send(Operation::Terminate); // to avoid channe rename in chan_select macro.
         loop {
             let _ = self.report_alive();
             chan_select! {
+                signal.recv() -> signal => {
+                    match signal {
+                        Some(SysSignal::USR1) => {
+                            for _ in 0..self.concurrency{
+                                term_func();
+                            }
+                        }
+                        Some(SysSignal::INT) => {
+                            info!("meet signal '{:?}'", signal);
+                        }
+                        Some(_) => {unimplemented!()}
+                        None => {unimplemented!()}
+                    }
+                },
                 tox.send(Operation::Run) => {},
                 rsx.recv() -> sig => {
                     debug!("received signal {:?}", sig);

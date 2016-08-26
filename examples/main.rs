@@ -1,19 +1,19 @@
 #![plugin(docopt_macros)]
 #![feature(plugin)]
 extern crate docopt;
-extern crate sidekiqrs;
+extern crate sidekiq;
 extern crate rustc_serialize;
 extern crate env_logger;
-use sidekiqrs::*;
+use sidekiq::*;
 
 docopt!(Args,
         r#"Sidekiq
-Usage: sidekiq -r <redis> -n <namespace> -c <concurrency> (-q <queue>...)
+Usage: sidekiq [-r <redis>] -n <namespace> [-c <concurrency>] (-q <queue>...)
 
 Options:
     -r <redis>, --redis <redis>  redis connection string [default: redis://localhost:6379].
     -n <namespace>, --namespace <namespace>  the namespace.
-    -c <concurrency>, --concurrency <concurrency>  how many workers do you want to start.
+    -c <concurrency>, --concurrency <concurrency>  how many workers do you want to start [default: 10].
     (-q <queue>...), (--queues <queue>...)  the queues, in `name:weight` format, e.g. `critial:10`.
 "#);
 

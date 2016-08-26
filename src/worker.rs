@@ -67,6 +67,10 @@ impl SidekiqWorker {
                         }
                     };
                 }
+                Some(Operation::Terminate) => {
+                    info!("{}: Terminate signal received, exit...", self.id);
+                    return;
+                }
                 None => unimplemented!(),
             }
         }

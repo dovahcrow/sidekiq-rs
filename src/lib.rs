@@ -29,7 +29,7 @@ extern crate chrono;
 
 #[macro_use]
 extern crate chan;
-
+extern crate chan_signal;
 
 mod server;
 mod job_handler;
