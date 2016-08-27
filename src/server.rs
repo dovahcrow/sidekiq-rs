@@ -13,8 +13,12 @@ use threadpool::ThreadPool;
 use worker::SidekiqWorker;
 use redis::Commands;
 
-use chan::sync;
+use chan::{sync, after, Receiver, Sender};
 use chan_signal::{Signal as SysSignal, notify};
+
+use std::sync::{Arc, Barrier};
+
+use std::time::Duration;
 
 #[derive(Debug)]
 pub enum Signal {
@@ -40,18 +44,19 @@ pub struct SidekiqServer<'a> {
     busy: usize,
     rs: String,
     pid: usize,
+    signal_chan: Receiver<SysSignal>,
     concurrency: usize,
 }
 
 impl<'a> SidekiqServer<'a> {
     pub fn new(redis: &str, concurrency: usize) -> Self {
+        let signal = notify(&[SysSignal::INT, SysSignal::USR1]); // should be here to set proper signal mask to all threads
         let now = UTC::now();
         let config = Config::builder()
             .pool_size(concurrency as u32 + 1)
             .build();
         let manager = RedisConnectionManager::new(redis).unwrap();
         let pool = Pool::new(config, manager).unwrap();
-
         SidekiqServer {
             redispool: pool,
             threadpool: ThreadPool::new(concurrency),
@@ -63,6 +68,7 @@ impl<'a> SidekiqServer<'a> {
             busy: 0,
             pid: 1,
             concurrency: concurrency,
+            signal_chan: signal,
             // random itentity
             rs: ::rand::thread_rng().gen_ascii_chars().take(12).collect(),
         }
@@ -82,12 +88,16 @@ impl<'a> SidekiqServer<'a> {
         info!("sidekiq-rs is running...");
         let (tsx, rsx) = sync(self.concurrency);
         let (tox, rox) = sync(self.concurrency);
-        let signal = notify(&[SysSignal::INT, SysSignal::USR1]);
+        let barrier = Arc::new(Barrier::new(self.concurrency + 1));
+        let signal = self.signal_chan.clone();
+
+        // start worker threads
         for _ in 0..self.concurrency {
             let worker = SidekiqWorker::new(&self.identity(),
                                             self.redispool.clone(),
                                             tsx.clone(),
                                             rox.clone(),
+                                            barrier.clone(),
                                             self.queues.clone(),
                                             self.weights.clone(),
                                             self.job_handler_factories
@@ -101,19 +111,23 @@ impl<'a> SidekiqServer<'a> {
 
             self.threadpool.execute(move || worker.work());
         }
-        let term_func = || tox.send(Operation::Terminate); // to avoid channe rename in chan_select macro.
+
+        // controller loop
+        let (tox2, rsx2) = (tox.clone(), rsx.clone());
         loop {
             let _ = self.report_alive();
             chan_select! {
                 signal.recv() -> signal => {
                     match signal {
                         Some(SysSignal::USR1) => {
-                            for _ in 0..self.concurrency{
-                                term_func();
-                            }
+                            info!("{:?}: Terminating", signal.unwrap());
+                            self.terminate_gracefully(tox2, rsx2, barrier);
+                            break;
                         }
                         Some(SysSignal::INT) => {
-                            info!("meet signal '{:?}'", signal);
+                            info!("{:?}: Force terminating", signal.unwrap());                            
+                            self.terminate_forcely(tox2, rsx2);
+                            break;
                         }
                         Some(_) => {unimplemented!()}
                         None => {unimplemented!()}
@@ -122,26 +136,80 @@ impl<'a> SidekiqServer<'a> {
                 tox.send(Operation::Run) => {},
                 rsx.recv() -> sig => {
                     debug!("received signal {:?}", sig);
-                    match sig {
-                        Some(Signal::Complete(_, n)) => {
-                            let _ = self.report_processed(n);
-                            if self.busy != 0 {
-                                self.busy -= 1;
-                            }
-                        },
-                        Some(Signal::Fail(_, n)) => {
-                            let _ = self.report_failed(n);
-                            if self.busy != 0 {
-                                self.busy -= 1;
-                            }
-                        },
-                        Some(Signal::Empty(_)) => {},
-                        Some(Signal::Acquire(_)) => {
-                            self.busy += 1;
-                        },
-                        None => unimplemented!()
-                    }
+                    sig.map(|s| self.deal_signal(s));
                 }
+            }
+        }
+
+        // exiting
+        info!("sidekiq exited");
+    }
+
+    fn inform_termination(&self, tox: Sender<Operation>) {
+        for _ in 0..self.concurrency {
+            tox.send(Operation::Terminate);
+        }
+    }
+
+    fn terminate_forcely(&mut self, tox: Sender<Operation>, rsx: Receiver<Signal>) {
+        self.inform_termination(tox);
+
+        let timer = after(Duration::from_secs(10));
+        // deplete the signal channel
+        loop {
+            chan_select! {
+                timer.recv() => {
+                    info!("force quitting");
+                    break;
+                },
+                rsx.recv() -> sig => {
+                    debug!("received signal {:?}", sig);
+                    sig.map(|s| self.deal_signal(s));
+                },
+            }
+        }
+    }
+
+    fn terminate_gracefully(&mut self,
+                            tox: Sender<Operation>,
+                            rsx: Receiver<Signal>,
+                            barrier: Arc<Barrier>) {
+        self.inform_termination(tox);
+
+        // deplete the signal channel
+        loop {
+            chan_select! {
+                default => {
+                    break;
+                },
+                rsx.recv() -> sig => {
+                    debug!("received signal {:?}", sig);
+                    sig.map(|s| self.deal_signal(s));
+                },
+            }
+        }
+
+        info!("waiting for other workers exit");
+        barrier.wait();
+    }
+
+    fn deal_signal(&mut self, sig: Signal) {
+        match sig {
+            Signal::Complete(_, n) => {
+                let _ = self.report_processed(n);
+                if self.busy != 0 {
+                    self.busy -= 1;
+                }
+            }
+            Signal::Fail(_, n) => {
+                let _ = self.report_failed(n);
+                if self.busy != 0 {
+                    self.busy -= 1;
+                }
+            }
+            Signal::Empty(_) => {}
+            Signal::Acquire(_) => {
+                self.busy += 1;
             }
         }
     }

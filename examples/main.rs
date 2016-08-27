@@ -8,7 +8,7 @@ use sidekiq::*;
 
 docopt!(Args,
         r#"Sidekiq
-Usage: sidekiq [-r <redis>] -n <namespace> [-c <concurrency>] (-q <queue>...)
+Usage: sidekiq [-r <redis>] [-n <namespace>] [-c <concurrency>] (-q <queue>...)
 
 Options:
     -r <redis>, --redis <redis>  redis connection string [default: redis://localhost:6379].

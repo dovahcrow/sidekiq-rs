@@ -13,6 +13,7 @@ use rand::Rng;
 use json::parse;
 use serde_json::to_string;
 use chrono::UTC;
+use std::sync::{Arc, Barrier};
 
 pub struct SidekiqWorker {
     id: String,
@@ -24,6 +25,7 @@ pub struct SidekiqWorker {
     handlers: BTreeMap<String, Box<JobHandler>>,
     tx: Sender<Signal>,
     rx: Receiver<Operation>,
+    barrier: Arc<Barrier>,
 }
 
 impl SidekiqWorker {
@@ -31,6 +33,7 @@ impl SidekiqWorker {
                pool: Pool<RedisConnectionManager>,
                tx: Sender<Signal>,
                rx: Receiver<Operation>,
+               barrier: Arc<Barrier>,
                queues: Vec<String>,
                weights: Vec<f64>,
                handlers: BTreeMap<String, Box<JobHandler>>,
@@ -46,6 +49,7 @@ impl SidekiqWorker {
             handlers: handlers,
             tx: tx,
             rx: rx,
+            barrier: barrier,
         }
     }
 
@@ -68,7 +72,8 @@ impl SidekiqWorker {
                     };
                 }
                 Some(Operation::Terminate) => {
-                    info!("{}: Terminate signal received, exit...", self.id);
+                    info!("{}: Terminate signal received, exiting...", self.id);
+                    self.barrier.wait();
                     return;
                 }
                 None => unimplemented!(),
