@@ -88,6 +88,10 @@ impl<'a> SidekiqServer<'a> {
 
     pub fn start(&mut self) {
         info!("sidekiq-rs is running...");
+        if self.queues.len() == 0 {
+            error!("queue is empty, exiting");
+            return;
+        }
         let (tsx, rsx) = sync(self.concurrency);
         let (tox, rox) = sync(self.concurrency);
         let barrier = Arc::new(Barrier::new(self.concurrency + 1));
@@ -235,13 +239,16 @@ impl<'a> SidekiqServer<'a> {
                              now.timestamp_subsec_micros() as f64 / 1000000f64)
                                .to_string())];
 
-        let _ = self.redispool
+        let _ = try!(self.redispool
             .get()
             .unwrap()
-            .hset_multiple(self.with_namespace(&self.identity()), &content)?;
-        let _ = self.redispool.get().unwrap().expire(self.with_namespace(&self.identity()), 5)?;
+            .hset_multiple(self.with_namespace(&self.identity()), &content));
         let _ =
-            self.redispool.get().unwrap().sadd(self.with_namespace(&"processes"), self.identity())?;
+            try!(self.redispool.get().unwrap().expire(self.with_namespace(&self.identity()), 5));
+        let _ = try!(self.redispool
+            .get()
+            .unwrap()
+            .sadd(self.with_namespace(&"processes"), self.identity()));
         Ok(())
 
     }
@@ -249,22 +256,22 @@ impl<'a> SidekiqServer<'a> {
     fn report_processed(&mut self, n: usize) -> Result<()> {
         let key = self.with_namespace(&format!("stat:processed:{}", UTC::now().format("%Y-%m-%d")));
         let connection = self.redispool.get().unwrap();
-        let _ = connection.incr(key, n)?;
+        let _ = try!(connection.incr(key, n));
 
         let key = self.with_namespace(&format!("stat:processed"));
         let connection = self.redispool.get().unwrap();
-        let _ = connection.incr(key, n)?;
+        let _ = try!(connection.incr(key, n));
         Ok(())
     }
 
     fn report_failed(&mut self, n: usize) -> Result<()> {
         let key = self.with_namespace(&format!("stat:failed:{}", UTC::now().format("%Y-%m-%d")));
         let connection = self.redispool.get().unwrap();
-        let _ = connection.incr(key, n)?;
+        let _ = try!(connection.incr(key, n));
 
         let key = self.with_namespace(&format!("stat:failed"));
         let connection = self.redispool.get().unwrap();
-        let _ = connection.incr(key, n)?;
+        let _ = try!(connection.incr(key, n));
         Ok(())
     }
 

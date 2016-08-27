@@ -25,27 +25,27 @@ impl Deserialize for Job {
     fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
         where D: Deserializer
     {
-        let j = JValue::deserialize(deserializer)?;
+        let j = try!(JValue::deserialize(deserializer));
         if let Some(obj) = j.as_object() {
             let mut obj = obj.clone();
             Ok(Job {
-                class: obj.get("class")
-                    .and_then(|v| v.as_str())
-                    .ok_or(D::Error::custom("no member 'class'"))?
+                class: try!(obj.get("class")
+                        .and_then(|v| v.as_str())
+                        .ok_or(D::Error::custom("no member 'class'")))
                     .into(),
-                args: obj.get("args")
-                    .and_then(|v| v.as_array())
-                    .ok_or(D::Error::custom("no member 'args'"))?
+                args: try!(obj.get("args")
+                        .and_then(|v| v.as_array())
+                        .ok_or(D::Error::custom("no member 'args'")))
                     .clone(),
-                queue: obj.get("queue")
-                    .and_then(|v| v.as_str())
-                    .ok_or(D::Error::custom("no member 'queue'"))?
+                queue: try!(obj.get("queue")
+                        .and_then(|v| v.as_str())
+                        .ok_or(D::Error::custom("no member 'queue'")))
                     .into(),
-                jid: obj.get("jid")
-                    .and_then(|v| v.as_str())
-                    .ok_or(D::Error::custom("no member 'jid'"))?
+                jid: try!(obj.get("jid")
+                        .and_then(|v| v.as_str())
+                        .ok_or(D::Error::custom("no member 'jid'")))
                     .into(),
-                retry: obj.get("retry")
+                retry: try!(obj.get("retry")
                     .and_then(|r| {
                         if r.is_u64() {
                             Some(BoolOrUSize::USize(r.as_u64().unwrap() as usize))
@@ -55,14 +55,14 @@ impl Deserialize for Job {
                             None
                         }
                     })
-                    .ok_or(D::Error::custom("no member 'retry'"))?,
-                created_at: obj.get("created_at")
-                    .and_then(|v| v.as_f64())
-                    .ok_or(D::Error::custom("no member 'created_at'"))?
+                    .ok_or(D::Error::custom("no member 'retry'"))),
+                created_at: try!(obj.get("created_at")
+                        .and_then(|v| v.as_f64())
+                        .ok_or(D::Error::custom("no member 'created_at'")))
                     .into(),
-                enqueued_at: obj.get("enqueued_at")
-                    .and_then(|v| v.as_f64())
-                    .ok_or(D::Error::custom("no member 'enqueued_at'"))?
+                enqueued_at: try!(obj.get("enqueued_at")
+                        .and_then(|v| v.as_f64())
+                        .ok_or(D::Error::custom("no member 'enqueued_at'")))
                     .into(),
                 extra: {
                     obj.remove("class");
@@ -85,40 +85,40 @@ impl Serialize for Job {
     fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
         where S: Serializer
     {
-        let mut state = serializer.serialize_map(Some(7 + self.extra.len()))?;
+        let mut state = try!(serializer.serialize_map(Some(7 + self.extra.len())));
 
-        serializer.serialize_map_key(&mut state, "class")?;
-        serializer.serialize_map_value(&mut state, &self.class)?;
+        try!(serializer.serialize_map_key(&mut state, "class"));
+        try!(serializer.serialize_map_value(&mut state, &self.class));
 
-        serializer.serialize_map_key(&mut state, "args")?;
-        serializer.serialize_map_value(&mut state, &self.args)?;
+        try!(serializer.serialize_map_key(&mut state, "args"));
+        try!(serializer.serialize_map_value(&mut state, &self.args));
 
-        serializer.serialize_map_key(&mut state, "queue")?;
-        serializer.serialize_map_value(&mut state, &self.queue)?;
+        try!(serializer.serialize_map_key(&mut state, "queue"));
+        try!(serializer.serialize_map_value(&mut state, &self.queue));
 
-        serializer.serialize_map_key(&mut state, "jid")?;
-        serializer.serialize_map_value(&mut state, &self.jid)?;
+        try!(serializer.serialize_map_key(&mut state, "jid"));
+        try!(serializer.serialize_map_value(&mut state, &self.jid));
 
-        serializer.serialize_map_key(&mut state, "created_at")?;
-        serializer.serialize_map_value(&mut state, &self.created_at)?;
+        try!(serializer.serialize_map_key(&mut state, "created_at"));
+        try!(serializer.serialize_map_value(&mut state, &self.created_at));
 
-        serializer.serialize_map_key(&mut state, "enqueued_at")?;
-        serializer.serialize_map_value(&mut state, &self.enqueued_at)?;
+        try!(serializer.serialize_map_key(&mut state, "enqueued_at"));
+        try!(serializer.serialize_map_value(&mut state, &self.enqueued_at));
 
         match self.retry {
             BoolOrUSize::Bool(x) => {
-                serializer.serialize_map_key(&mut state, "retry")?;
-                serializer.serialize_map_value(&mut state, x)?;
+                try!(serializer.serialize_map_key(&mut state, "retry"));
+                try!(serializer.serialize_map_value(&mut state, x));
             }
             BoolOrUSize::USize(x) => {
-                serializer.serialize_map_key(&mut state, "retry")?;
-                serializer.serialize_map_value(&mut state, x)?;
+                try!(serializer.serialize_map_key(&mut state, "retry"));
+                try!(serializer.serialize_map_value(&mut state, x));
             }
         };
 
         for (k, v) in &self.extra {
-            serializer.serialize_map_key(&mut state, k)?;
-            serializer.serialize_map_value(&mut state, v)?;
+            try!(serializer.serialize_map_key(&mut state, k));
+            try!(serializer.serialize_map_value(&mut state, v));
         }
 
         serializer.serialize_map_end(state)

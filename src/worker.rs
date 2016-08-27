@@ -85,14 +85,14 @@ impl SidekiqWorker {
         let queue_name = self.queue_name(name);
         debug!("queue name '{}'", queue_name);
 
-        let result: Option<Vec<String>> = self.pool.get()?.brpop(&queue_name, 2)?;
+        let result: Option<Vec<String>> = try!(try!(self.pool.get()).brpop(&queue_name, 2));
 
         if let Some(result) = result {
-            let job: Job = from_str(&result[1])?;
+            let job: Job = try!(from_str(&result[1]));
             self.tx.send(Signal::Acquire(self.id.clone()));
-            self.report_working(&job)?;
-            self.perform(&job)?;
-            self.report_done()?;
+            try!(self.report_working(&job));
+            try!(self.perform(&job));
+            try!(self.report_done());
             Ok(true)
         } else {
             Ok(false)
@@ -103,7 +103,7 @@ impl SidekiqWorker {
     fn perform(&mut self, job: &Job) -> Result<()> {
         debug!("job is {:?}", job);
         if let Some(handler) = self.handlers.get_mut(&job.class) {
-            handler.handle(&job)?;
+            try!(handler.handle(&job));
             Ok(())
         } else {
             warn!("unknown job class '{}'", job.class);
@@ -117,20 +117,18 @@ impl SidekiqWorker {
             "payload" => parse(&to_string(job).unwrap()).unwrap(),
             "run_at" => UTC::now().timestamp()
         };
-        self.pool
-            .get()?
-            .hset(&self.with_namespace(&self.with_server_id("workers")),
-                  &self.id,
-                  payload.dump())?;
-        let _ = self.pool.get()?.expire(&self.with_namespace(&self.with_server_id("workers")), 5)?;
+        try!(try!(self.pool.get()).hset(&self.with_namespace(&self.with_server_id("workers")),
+                                        &self.id,
+                                        payload.dump()));
+        let _ = try!(try!(self.pool.get())
+            .expire(&self.with_namespace(&self.with_server_id("workers")), 5));
         Ok(())
     }
 
     fn report_done(&self) -> Result<()> {
-        let _ = self.pool
-            .get()?
+        let _ = try!(try!(self.pool.get())
             .hdel(&self.with_namespace(&self.with_server_id("workers")),
-                  &self.id)?;
+                  &self.id));
         Ok(())
     }
 

@@ -1,13 +1,12 @@
-#![plugin(docopt_macros)]
-#![feature(plugin)]
 extern crate docopt;
 extern crate sidekiq;
 extern crate rustc_serialize;
 extern crate env_logger;
 use sidekiq::*;
+use docopt::Docopt;
 
-docopt!(Args,
-        r#"Sidekiq
+
+const USAGE: &'static str =       r#"Sidekiq
 Usage: sidekiq [-r <redis>] [-n <namespace>] [-c <concurrency>] (-q <queue>...)
 
 Options:
@@ -15,18 +14,25 @@ Options:
     -n <namespace>, --namespace <namespace>  the namespace.
     -c <concurrency>, --concurrency <concurrency>  how many workers do you want to start [default: 10].
     (-q <queue>...), (--queues <queue>...)  the queues, in `name:weight` format, e.g. `critial:10`.
-"#);
+"#;
 
+#[derive(Debug, RustcDecodable)]
+struct Args {
+    flag_redis: String,
+    flag_namespace: String,
+    flag_concurrency: usize,
+    arg_queue: Vec<String>,
+}
 
 fn main() {
     env_logger::init().unwrap();
-    let args: Args = Args::docopt().decode().unwrap_or_else(|e| e.exit());
-
+    let args: Args = Docopt::new(USAGE).and_then(|d| d.decode()).unwrap_or_else(|e| e.exit());
+    println!("{:?}", args);
     let redis = args.flag_redis;
 
     let namespace = args.flag_namespace;
 
-    let concurrency = args.flag_concurrency.parse().unwrap();
+    let concurrency = args.flag_concurrency;
 
     let queues: Vec<_> = args.arg_queue
         .into_iter()
