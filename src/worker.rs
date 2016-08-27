@@ -17,7 +17,7 @@ use chrono::UTC;
 use std::panic::{catch_unwind, resume_unwind, AssertUnwindSafe};
 
 pub struct SidekiqWorker {
-    id: String,
+    pub id: String,
     server_id: String,
     pool: Pool<RedisConnectionManager>,
     namespace: String,

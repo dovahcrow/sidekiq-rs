@@ -42,11 +42,10 @@ pub struct SidekiqServer<'a> {
     queues: Vec<String>,
     weights: Vec<f64>,
     started_at: f64,
-    busy: usize,
     rs: String,
     pid: usize,
     signal_chan: Receiver<SysSignal>,
-    worker_count: usize,
+    worker_info: BTreeMap<String, bool>, // busy?
     concurrency: usize,
     pub force_quite_timeout: usize,
 }
@@ -70,9 +69,8 @@ impl<'a> SidekiqServer<'a> {
             queues: vec![],
             weights: vec![],
             started_at: now.timestamp() as f64 + now.timestamp_subsec_micros() as f64 / 1000000f64,
-            busy: 0,
             pid: thread_id::get(),
-            worker_count: 0,
+            worker_info: BTreeMap::new(),
             concurrency: concurrency,
             signal_chan: signal,
             force_quite_timeout: 10,
@@ -128,12 +126,12 @@ impl<'a> SidekiqServer<'a> {
                 rsx.recv() -> sig => {
                     debug!("received signal {:?}", sig);
                     sig.map(|s| self.deal_signal(s));
-                    
+                    let worker_count = self.worker_info.len();
                     // relaunch workers if they died unexpectly
-                    if self.worker_count < self.concurrency {
+                    if worker_count< self.concurrency {
                         warn!("worker down, restarting");
                         self.launch_workers(tsx.clone(), rox.clone());
-                    } else if self.worker_count > self.concurrency {
+                    } else if worker_count > self.concurrency {
                         unreachable!("unreachable! worker_count can never larger than concurrency!")
                     }
                 }
@@ -147,7 +145,7 @@ impl<'a> SidekiqServer<'a> {
     // Worker start/terminate functions
 
     fn launch_workers(&mut self, tsx: Sender<Signal>, rox: Receiver<Operation>) {
-        while self.worker_count != self.concurrency {
+        while self.worker_info.len() < self.concurrency {
             self.launch_worker(tsx.clone(), rox.clone());
         }
     }
@@ -167,9 +165,8 @@ impl<'a> SidekiqServer<'a> {
                                             })
                                             .collect(),
                                         self.namespace.clone());
-
+        self.worker_info.insert(worker.id.clone(), false);
         self.threadpool.execute(move || worker.work());
-        self.worker_count += 1;
     }
 
     fn inform_termination(&self, tox: Sender<Operation>) {
@@ -192,7 +189,7 @@ impl<'a> SidekiqServer<'a> {
                 rsx.recv() -> sig => {
                     debug!("received signal {:?}", sig);
                     sig.map(|s| self.deal_signal(s));
-                    if self.worker_count == 0 {
+                    if self.worker_info.len() == 0 {
                         break
                     }
                 },
@@ -210,7 +207,7 @@ impl<'a> SidekiqServer<'a> {
                 rsx.recv() -> sig => {
                     debug!("received signal {:?}", sig);
                     sig.map(|s| self.deal_signal(s));
-                    if self.worker_count == 0 {
+                    if self.worker_info.len()== 0 {
                         break
                     }
                 },
@@ -220,25 +217,20 @@ impl<'a> SidekiqServer<'a> {
 
     fn deal_signal(&mut self, sig: Signal) {
         match sig {
-            Signal::Complete(_, n) => {
+            Signal::Complete(id, n) => {
                 let _ = self.report_processed(n);
-                if self.busy != 0 {
-                    self.busy -= 1;
-                }
+                self.worker_info.insert(id, false);
             }
-            Signal::Fail(_, n) => {
+            Signal::Fail(id, n) => {
                 let _ = self.report_failed(n);
-                if self.busy != 0 {
-                    self.busy -= 1;
-                }
+                self.worker_info.insert(id, false);
             }
             Signal::Empty(_) => {}
-            Signal::Acquire(_) => {
-                self.busy += 1;
+            Signal::Acquire(id) => {
+                self.worker_info.insert(id, true);
             }
-            Signal::Terminated(_) => {
-                self.worker_count -= 1;
-                self.busy -= 1;
+            Signal::Terminated(id) => {
+                self.worker_info.remove(&id);
             }
         }
     }
@@ -258,7 +250,7 @@ impl<'a> SidekiqServer<'a> {
                                 "identity"=> self.identity()
                             }
                                .dump()),
-                           ("busy", self.busy.to_string()),
+                           ("busy", self.worker_info.len().to_string()),
                            ("beat",
                             (now.timestamp() as f64 +
                              now.timestamp_subsec_micros() as f64 / 1000000f64)
