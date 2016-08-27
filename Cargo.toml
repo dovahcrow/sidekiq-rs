@@ -5,7 +5,7 @@ homepage = "https://github.com/doomsplayer/sidekiq-rs"
 license = "MIT"
 name = "sidekiq-rs"
 repository = "https://github.com/doomsplayer/sidekiq-rs"
-version = "0.1.1"
+version = "0.1.2"
 
 [dependencies]
 chan = "0.1.18"
