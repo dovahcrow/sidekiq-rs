@@ -3,7 +3,6 @@ use std::error::Error;
 use std::fmt::{Display, Formatter, Result as FmtResult};
 use std::thread;
 use std::time::Duration;
-
 use std::marker::Sync;
 
 
@@ -21,6 +20,7 @@ impl Display for JobHandlerError {
         write!(fmt, "{:?}", self)
     }
 }
+
 
 
 pub trait JobHandlerFactory {
@@ -68,5 +68,24 @@ unsafe impl Sync for ErrorHandler {}
 impl JobHandler for ErrorHandler {
     fn handle(&mut self, _: &Job) -> Result<(), JobHandlerError> {
         Err(JobHandlerError(Box::new("a".parse::<i8>().unwrap_err())))
+    }
+}
+
+
+pub struct PanicHandlerFactory;
+
+impl JobHandlerFactory for PanicHandlerFactory {
+    fn produce(&mut self) -> Box<JobHandler> {
+        Box::new(PanicHandler)
+    }
+}
+
+pub struct PanicHandler;
+
+unsafe impl Sync for PanicHandler {}
+
+impl JobHandler for PanicHandler {
+    fn handle(&mut self, _: &Job) -> Result<(), JobHandlerError> {
+        panic!("yeah, I do it deliberately")
     }
 }

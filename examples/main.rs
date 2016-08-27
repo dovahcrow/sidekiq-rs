@@ -7,13 +7,14 @@ use docopt::Docopt;
 
 
 const USAGE: &'static str =       r#"Sidekiq
-Usage: sidekiq [-r <redis>] [-n <namespace>] [-c <concurrency>] (-q <queue>...)
+Usage: sidekiq [-r <redis>] [-n <namespace>] [-c <concurrency>] (-q <queue>...) [-t <timeout>]
 
 Options:
     -r <redis>, --redis <redis>  redis connection string [default: redis://localhost:6379].
     -n <namespace>, --namespace <namespace>  the namespace.
     -c <concurrency>, --concurrency <concurrency>  how many workers do you want to start [default: 10].
     (-q <queue>...), (--queues <queue>...)  the queues, in `name:weight` format, e.g. `critial:10`.
+    -t <timeout>, --force-quite-timeout <timeout>  the timeout when force terminated [default: 10].
 "#;
 
 #[derive(Debug, RustcDecodable)]
@@ -22,17 +23,12 @@ struct Args {
     flag_namespace: String,
     flag_concurrency: usize,
     arg_queue: Vec<String>,
+    flag_t: usize,
 }
 
 fn main() {
     env_logger::init().unwrap();
     let args: Args = Docopt::new(USAGE).and_then(|d| d.decode()).unwrap_or_else(|e| e.exit());
-    println!("{:?}", args);
-    let redis = args.flag_redis;
-
-    let namespace = args.flag_namespace;
-
-    let concurrency = args.flag_concurrency;
 
     let queues: Vec<_> = args.arg_queue
         .into_iter()
@@ -44,23 +40,22 @@ fn main() {
         })
         .collect();
 
-    let mut handler = PrinterHandlerFactory;
-    let mut handler2 = ErrorHandlerFactory;
+    let mut handler_printer = PrinterHandlerFactory;
+    let mut handler_error = ErrorHandlerFactory;
+    let mut handler_panic = PanicHandlerFactory;
 
-    let mut server = SidekiqServer::new(&redis, concurrency);
+    let mut server = SidekiqServer::new(&args.flag_redis, args.flag_concurrency);
 
-    server.attach_handler_factory("Dummy", &mut handler);
-    server.attach_handler_factory("Error", &mut handler2);
+    server.attach_handler_factory("Printer", &mut handler_printer);
+    server.attach_handler_factory("Error", &mut handler_error);
+    server.attach_handler_factory("Panic", &mut handler_panic);
 
     for (name, weight) in queues {
         server.new_queue(&name, weight);
     }
 
-    if namespace == "" {
-        server.namespace = None
-    } else {
-        server.namespace = Some(namespace)
-    }
+    server.namespace = args.flag_namespace;
+    server.force_quite_timeout = args.flag_t;
     server.start();
 
 }

@@ -13,19 +13,19 @@ use rand::Rng;
 use json::parse;
 use serde_json::to_string;
 use chrono::UTC;
-use std::sync::{Arc, Barrier};
+
+use std::panic::{catch_unwind, resume_unwind, AssertUnwindSafe};
 
 pub struct SidekiqWorker {
     id: String,
     server_id: String,
     pool: Pool<RedisConnectionManager>,
-    namespace: Option<String>,
+    namespace: String,
     queues: Vec<String>,
     weights: Vec<f64>,
     handlers: BTreeMap<String, Box<JobHandler>>,
     tx: Sender<Signal>,
     rx: Receiver<Operation>,
-    barrier: Arc<Barrier>,
 }
 
 impl SidekiqWorker {
@@ -33,11 +33,10 @@ impl SidekiqWorker {
                pool: Pool<RedisConnectionManager>,
                tx: Sender<Signal>,
                rx: Receiver<Operation>,
-               barrier: Arc<Barrier>,
                queues: Vec<String>,
                weights: Vec<f64>,
                handlers: BTreeMap<String, Box<JobHandler>>,
-               namespace: Option<String>)
+               namespace: String)
                -> SidekiqWorker {
         SidekiqWorker {
             id: ::rand::thread_rng().gen_ascii_chars().take(9).collect(),
@@ -49,12 +48,13 @@ impl SidekiqWorker {
             handlers: handlers,
             tx: tx,
             rx: rx,
-            barrier: barrier,
         }
     }
 
     pub fn work(mut self) {
         let mut choice = random_choice();
+        info!("worker '{}' start working", self.with_server_id(&self.id));
+        // main loop is here
         loop {
             match self.rx.recv() {
                 Some(Operation::Run) => {
@@ -73,7 +73,7 @@ impl SidekiqWorker {
                 }
                 Some(Operation::Terminate) => {
                     info!("{}: Terminate signal received, exiting...", self.id);
-                    self.barrier.wait();
+                    self.tx.send(Signal::Terminated(self.id.clone()));
                     return;
                 }
                 None => unimplemented!(),
@@ -97,19 +97,29 @@ impl SidekiqWorker {
         } else {
             Ok(false)
         }
-
     }
 
     fn perform(&mut self, job: &Job) -> Result<()> {
         debug!("job is {:?}", job);
         if let Some(handler) = self.handlers.get_mut(&job.class) {
-            try!(handler.handle(&job));
+            match catch_unwind(AssertUnwindSafe(|| handler.handle(&job))) {
+                Err(e) => {
+                    error!("Worker '{}' panicked", self.id);
+                    self.tx.send(Signal::Terminated(self.id.clone()));
+                    resume_unwind(e)
+                }
+                Ok(r) => {
+                    try!(r);
+                }
+            }
             Ok(())
         } else {
             warn!("unknown job class '{}'", job.class);
             Ok(())
         }
     }
+
+    // Sidekiq dashboard reporting functions
 
     fn report_working(&self, job: &Job) -> Result<()> {
         let payload = object! {
@@ -133,7 +143,11 @@ impl SidekiqWorker {
     }
 
     fn with_namespace(&self, snippet: &str) -> String {
-        self.namespace.clone().map(|v| v + ":").unwrap_or("".into()) + snippet
+        if self.namespace == "" {
+            snippet.into()
+        } else {
+            self.namespace.clone() + ":" + snippet
+        }
     }
 
     fn with_server_id(&self, snippet: &str) -> String {

@@ -1,6 +1,6 @@
 require 'sidekiq'
 
-class Dummy
+class Panic
   include Sidekiq::Worker
   sidekiq_options :queue => :analytics, :backtrace => true
   
