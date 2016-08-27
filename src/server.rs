@@ -20,6 +20,8 @@ use std::sync::{Arc, Barrier};
 
 use std::time::Duration;
 
+use thread_id;
+
 #[derive(Debug)]
 pub enum Signal {
     Complete(String, usize),
@@ -66,7 +68,7 @@ impl<'a> SidekiqServer<'a> {
             weights: vec![],
             started_at: now.timestamp() as f64 + now.timestamp_subsec_micros() as f64 / 1000000f64,
             busy: 0,
-            pid: 1,
+            pid: thread_id::get(),
             concurrency: concurrency,
             signal_chan: signal,
             // random itentity

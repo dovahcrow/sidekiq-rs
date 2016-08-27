@@ -27,6 +27,7 @@ rustc-serialize = "0.3.19"
 serde = "0.8"
 serde_json = "0.8"
 serde_macros = "0.8"
+thread-id = "2.0.0"
 threadpool = "1.0.0"
 
 [lib]
