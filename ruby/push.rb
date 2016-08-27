@@ -15,9 +15,9 @@ require_relative 'lib/worker/error'
   Dummy.perform_async('Stranger')
 end
 
-10_0.times do
-  Error.perform_async('Stranger')
-end
+# 10_0.times do
+#   Error.perform_async('Stranger')
+# end
 # 10.times do
 #   Excep.perform_async("damn")
 # end

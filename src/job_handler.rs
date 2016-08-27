@@ -46,7 +46,7 @@ unsafe impl Sync for PrinterHandler {}
 
 impl JobHandler for PrinterHandler {
     fn handle(&mut self, job: &Job) -> Result<(), JobHandlerError> {
-        info!("handling {}", job.class);
+        info!("handling {:?}", job);
         thread::sleep(Duration::from_secs(2));
         Ok(())
     }
