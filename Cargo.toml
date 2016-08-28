@@ -5,8 +5,9 @@ homepage = "https://github.com/doomsplayer/sidekiq-rs"
 license = "MIT"
 name = "sidekiq-rs"
 repository = "https://github.com/doomsplayer/sidekiq-rs"
-version = "0.2.5"
+version = "0.2.6"
 readme = "README.md"
+keywords = ["sidekiq", "worker", "resque", "ruby"]
 
 [dependencies]
 chan = "0.1.18"
