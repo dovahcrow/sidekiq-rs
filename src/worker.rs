@@ -81,10 +81,14 @@ impl SidekiqWorker {
                 },
                 clock.recv() => {
                     // synchronize state
-                    self.tx.send(Signal::Complete(self.id.clone(), self.processed));
-                    self.tx.send(Signal::Fail(self.id.clone(), self.failed));
-                    self.processed = 0;
-                    self.failed = 0;
+                    if self.processed != 0 {
+                        self.tx.send(Signal::Complete(self.id.clone(), self.processed));
+                        self.processed = 0;
+                    }
+                    if self.failed != 0 {
+                        self.tx.send(Signal::Fail(self.id.clone(), self.failed));
+                        self.failed = 0;
+                    }
                 },
                 rx.recv() -> op => {
                     if let Some(Operation::Terminate) =op {
