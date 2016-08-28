@@ -46,4 +46,7 @@ mod worker;
 pub use server::SidekiqServer;
 pub use job_handler::{PrinterHandlerFactory, ErrorHandlerFactory, JobHandlerFactory,
                       PanicHandlerFactory, JobHandler};
+
+pub use job::Job;
+
 pub use errors::*;
