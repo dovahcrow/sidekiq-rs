@@ -55,28 +55,32 @@ impl SidekiqWorker {
         let mut choice = random_choice();
         info!("worker '{}' start working", self.with_server_id(&self.id));
         // main loop is here
+        let rx = self.rx.clone();
         loop {
-            match self.rx.recv() {
-                Some(Operation::Run) => {
+            chan_select! {
+                default => {
                     let queue_name = {
                         let v = choice.random_choice_f64(&self.queues, &self.weights, 1);
                         v[0].clone()
                     };
                     match self.run_queue_once(&queue_name) {
                         Ok(true) => self.tx.send(Signal::Complete(self.id.clone(), 1)),
-                        Ok(false) => self.tx.send(Signal::Empty(self.id.clone())),
+                        Ok(false) => {}
                         Err(e) => {
                             self.tx.send(Signal::Fail(self.id.clone(), 1));
                             warn!("uncaught error '{}'", e);
                         }
                     };
-                }
-                Some(Operation::Terminate) => {
-                    info!("{}: Terminate signal received, exiting...", self.id);
-                    self.tx.send(Signal::Terminated(self.id.clone()));
-                    return;
-                }
-                None => unimplemented!(),
+                },
+                rx.recv() -> op => {
+                    if let Some(Operation::Terminate) =op {
+                        info!("{}: Terminate signal received, exiting...", self.id);
+                        self.tx.send(Signal::Terminated(self.id.clone()));
+                        return;
+                    } else {
+                        unimplemented!()
+                    }
+                },
             }
         }
     }

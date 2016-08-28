@@ -25,12 +25,10 @@ pub enum Signal {
     Complete(String, usize),
     Fail(String, usize),
     Acquire(String),
-    Empty(String),
     Terminated(String),
 }
 
 pub enum Operation {
-    Run,
     Terminate,
 }
 
@@ -122,13 +120,12 @@ impl<'a> SidekiqServer<'a> {
                         None => {unimplemented!()}
                     }
                 },
-                tox.send(Operation::Run) => {},
                 rsx.recv() -> sig => {
                     debug!("received signal {:?}", sig);
                     sig.map(|s| self.deal_signal(s));
                     let worker_count = self.worker_info.len();
                     // relaunch workers if they died unexpectly
-                    if worker_count< self.concurrency {
+                    if worker_count < self.concurrency {
                         warn!("worker down, restarting");
                         self.launch_workers(tsx.clone(), rox.clone());
                     } else if worker_count > self.concurrency {
@@ -219,13 +216,12 @@ impl<'a> SidekiqServer<'a> {
         match sig {
             Signal::Complete(id, n) => {
                 let _ = self.report_processed(n);
-                self.worker_info.insert(id, false);
+                *self.worker_info.get_mut(&id).unwrap() = false;
             }
             Signal::Fail(id, n) => {
                 let _ = self.report_failed(n);
-                self.worker_info.insert(id, false);
+                *self.worker_info.get_mut(&id).unwrap() = false;
             }
-            Signal::Empty(_) => {}
             Signal::Acquire(id) => {
                 self.worker_info.insert(id, true);
             }

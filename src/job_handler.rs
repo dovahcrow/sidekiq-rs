@@ -1,8 +1,6 @@
 use ::job::Job;
 use std::error::Error;
 use std::fmt::{Display, Formatter, Result as FmtResult};
-use std::thread;
-use std::time::Duration;
 use std::marker::Sync;
 
 
@@ -47,7 +45,6 @@ unsafe impl Sync for PrinterHandler {}
 impl JobHandler for PrinterHandler {
     fn handle(&mut self, job: &Job) -> Result<(), JobHandlerError> {
         info!("handling {:?}", job);
-        thread::sleep(Duration::from_secs(2));
         Ok(())
     }
 }
