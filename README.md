@@ -6,9 +6,8 @@ same as vanilla when you take a look into
 sidekiq's dashboard.
 
 The basic idea is that, since ruby is slow, we write job handlers
-in rust with native code, and put dummy tasks in ruby.
-When ruby submit task with sidekiq then it will be captured on rust
-side using name(job class name) matching.
+in rust with native code. So we write job definitions in ruby and implementations in rust
+and enqueue jobs in ruby and done jobs in rust.
 
 ## Snapshots:
 
