@@ -6,6 +6,7 @@ extern crate env_logger;
 extern crate flame;
 use sidekiq::*;
 use docopt::Docopt;
+#[cfg(feature="flame_it")]
 use std::fs::File;
 
 const USAGE: &'static str =       r#"Sidekiq
@@ -58,13 +59,18 @@ fn main() {
 
     server.namespace = args.flag_namespace;
     server.force_quite_timeout = args.flag_t;
+    start(server)
+}
 
-    if cfg!(feature = "flame_it") {
-        flame::start("bench");
-        server.start();
-        flame::end("bench");
-        flame::dump_html(&mut File::create("flame-graph.html").unwrap()).unwrap();
-    } else {
-        server.start();
-    }
+#[cfg(feature="flame_it")]
+fn start(server: SidekiqServer) {
+    flame::start("bench");
+    server.start();
+    flame::end("bench");
+    flame::dump_html(&mut File::create("flame-graph.html").unwrap()).unwrap();
+}
+
+#[cfg(not(feature="flame_it"))]
+fn start(mut server: SidekiqServer) {
+    server.start();
 }
