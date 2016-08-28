@@ -37,7 +37,7 @@ extern crate chan_signal;
 
 mod server;
 mod job_handler;
-mod errors;
+pub mod errors;
 mod job;
 mod utils;
 mod worker;
@@ -48,5 +48,3 @@ pub use job_handler::{PrinterHandlerFactory, ErrorHandlerFactory, JobHandlerFact
                       PanicHandlerFactory, JobHandler, JobHandlerError};
 
 pub use job::Job;
-
-pub use errors::*;

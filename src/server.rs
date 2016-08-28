@@ -77,9 +77,9 @@ impl<'a> SidekiqServer<'a> {
         }
     }
 
-    pub fn new_queue(&mut self, name: &str, weight: f64) {
+    pub fn new_queue(&mut self, name: &str, weight: usize) {
         self.queues.push(name.into());
-        self.weights.push(weight);
+        self.weights.push(weight as f64);
     }
 
     pub fn attach_handler_factory(&mut self, name: &str, handle: &'a mut JobHandlerFactory) {
