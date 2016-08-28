@@ -5,3 +5,4 @@
 
 target
 *.html
+.DS_Store
