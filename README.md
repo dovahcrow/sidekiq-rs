@@ -12,6 +12,9 @@ side using name(job class name) matching.
 
 ## Snapshots:
 
+![dashboard](screenshot/dashboard.png)
+
+![tui](screenshot/tui.png)
 
 ## Usage:
 
