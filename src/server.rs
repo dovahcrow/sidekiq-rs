@@ -251,7 +251,7 @@ impl<'a> SidekiqServer<'a> {
                                 "identity"=> self.identity()
                             }
                                .dump()),
-                           ("busy", self.worker_info.len().to_string()),
+                           ("busy", self.worker_info.values().filter(|v| **v).count().to_string()),
                            ("beat",
                             (now.timestamp() as f64 +
                              now.timestamp_subsec_micros() as f64 / 1000000f64)
