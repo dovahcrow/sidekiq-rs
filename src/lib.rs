@@ -1,7 +1,12 @@
+#![cfg_attr(feature="flame_it", feature(plugin,custom_attribute))]
+#![cfg_attr(feature="flame_it", plugin(flamer))]
+
+#[cfg(feature="flame_it")]
+extern crate flame;
+
 extern crate serde;
 extern crate serde_json;
 
-extern crate rustc_serialize;
 #[macro_use]
 extern crate json;
 

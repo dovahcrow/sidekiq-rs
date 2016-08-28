@@ -1,6 +1,6 @@
 use random_choice::random_choice;
 use server::{Signal, Operation};
-use chan::{Sender, Receiver};
+use chan::{Sender, Receiver, tick};
 use r2d2_redis::RedisConnectionManager;
 use r2d2::Pool;
 use job::Job;
@@ -16,6 +16,8 @@ use chrono::UTC;
 
 use std::panic::{catch_unwind, resume_unwind, AssertUnwindSafe};
 
+use std::time::Duration;
+
 pub struct SidekiqWorker {
     pub id: String,
     server_id: String,
@@ -26,6 +28,8 @@ pub struct SidekiqWorker {
     handlers: BTreeMap<String, Box<JobHandler>>,
     tx: Sender<Signal>,
     rx: Receiver<Operation>,
+    processed: usize,
+    failed: usize,
 }
 
 impl SidekiqWorker {
@@ -48,6 +52,8 @@ impl SidekiqWorker {
             handlers: handlers,
             tx: tx,
             rx: rx,
+            processed: 0,
+            failed: 0,
         }
     }
 
@@ -56,6 +62,7 @@ impl SidekiqWorker {
         info!("worker '{}' start working", self.with_server_id(&self.id));
         // main loop is here
         let rx = self.rx.clone();
+        let clock = tick(Duration::from_secs(1));
         loop {
             chan_select! {
                 default => {
@@ -64,13 +71,20 @@ impl SidekiqWorker {
                         v[0].clone()
                     };
                     match self.run_queue_once(&queue_name) {
-                        Ok(true) => self.tx.send(Signal::Complete(self.id.clone(), 1)),
+                        Ok(true) => self.processed +=1,
                         Ok(false) => {}
                         Err(e) => {
-                            self.tx.send(Signal::Fail(self.id.clone(), 1));
+                            self.failed += 1;
                             warn!("uncaught error '{}'", e);
                         }
                     };
+                },
+                clock.recv() => {
+                    // synchronize state
+                    self.tx.send(Signal::Complete(self.id.clone(), self.processed));
+                    self.tx.send(Signal::Fail(self.id.clone(), self.failed));
+                    self.processed = 0;
+                    self.failed = 0;
                 },
                 rx.recv() -> op => {
                     if let Some(Operation::Terminate) =op {
@@ -85,6 +99,7 @@ impl SidekiqWorker {
         }
     }
 
+    #[cfg_attr(feature="flame_it", flame)]
     fn run_queue_once(&mut self, name: &str) -> Result<bool> {
         let queue_name = self.queue_name(name);
         debug!("queue name '{}'", queue_name);
@@ -103,6 +118,7 @@ impl SidekiqWorker {
         }
     }
 
+    #[cfg_attr(feature="flame_it", flame)]
     fn perform(&mut self, job: &Job) -> Result<()> {
         debug!("job is {:?}", job);
         if let Some(handler) = self.handlers.get_mut(&job.class) {
@@ -125,6 +141,7 @@ impl SidekiqWorker {
 
     // Sidekiq dashboard reporting functions
 
+    #[cfg_attr(feature="flame_it", flame)]
     fn report_working(&self, job: &Job) -> Result<()> {
         let payload = object! {
             "queue" => job.queue.clone(),
@@ -139,6 +156,7 @@ impl SidekiqWorker {
         Ok(())
     }
 
+    #[cfg_attr(feature="flame_it", flame)]
     fn report_done(&self) -> Result<()> {
         let _ = try!(try!(self.pool.get())
             .hdel(&self.with_namespace(&self.with_server_id("workers")),
@@ -146,6 +164,7 @@ impl SidekiqWorker {
         Ok(())
     }
 
+    #[cfg_attr(feature="flame_it", flame)]
     fn with_namespace(&self, snippet: &str) -> String {
         if self.namespace == "" {
             snippet.into()
@@ -154,10 +173,12 @@ impl SidekiqWorker {
         }
     }
 
+    #[cfg_attr(feature="flame_it", flame)]
     fn with_server_id(&self, snippet: &str) -> String {
         self.server_id.clone() + ":" + snippet
     }
 
+    #[cfg_attr(feature="flame_it", flame)]
     fn queue_name(&self, name: &str) -> String {
         self.with_namespace(&("queue:".to_string() + name))
     }
