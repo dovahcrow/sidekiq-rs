@@ -5,7 +5,7 @@ use std::marker::Sync;
 
 
 #[derive(Debug)]
-pub struct JobHandlerError(Box<Error + Send>);
+pub struct JobHandlerError(pub Box<Error + Send>);
 
 impl Error for JobHandlerError {
     fn description(&self) -> &str {
