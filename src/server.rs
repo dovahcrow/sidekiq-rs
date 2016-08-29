@@ -13,7 +13,7 @@ use threadpool::ThreadPool;
 use worker::SidekiqWorker;
 use redis::Commands;
 
-use chan::{sync, after, Receiver, Sender};
+use chan::{sync, after, tick, Receiver, Sender};
 use chan_signal::{Signal as SysSignal, notify};
 
 use std::time::Duration;
@@ -101,6 +101,7 @@ impl<'a> SidekiqServer<'a> {
 
         // controller loop
         let (tox2, rsx2) = (tox.clone(), rsx.clone()); // rename channels cuz `chan_select!` will rename'em below
+        let clock = tick(Duration::from_secs(5)); // report to sidekiq every 5 secs
         loop {
             let _ = self.report_alive();
             chan_select! {
@@ -120,6 +121,7 @@ impl<'a> SidekiqServer<'a> {
                         None => {unimplemented!()}
                     }
                 },
+                clock.recv() => {},
                 rsx.recv() -> sig => {
                     debug!("received signal {:?}", sig);
                     sig.map(|s| self.deal_signal(s));
