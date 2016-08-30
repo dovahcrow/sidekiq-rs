@@ -91,7 +91,7 @@ impl SidekiqWorker {
                     }
                 },
                 rx.recv() -> op => {
-                    if let Some(Operation::Terminate) =op {
+                    if let Some(Operation::Terminate) = op {
                         info!("{}: Terminate signal received, exiting...", self.id);
                         self.tx.send(Signal::Terminated(self.id.clone()));
                         return;
