@@ -81,14 +81,7 @@ impl SidekiqWorker {
                 },
                 clock.recv() => {
                     // synchronize state
-                    if self.processed != 0 {
-                        self.tx.send(Signal::Complete(self.id.clone(), self.processed));
-                        self.processed = 0;
-                    }
-                    if self.failed != 0 {
-                        self.tx.send(Signal::Fail(self.id.clone(), self.failed));
-                        self.failed = 0;
-                    }
+                    self.sync_state();
                 },
                 rx.recv() -> op => {
                     if let Some(Operation::Terminate) = op {
@@ -130,6 +123,7 @@ impl SidekiqWorker {
                 Err(e) => {
                     error!("Worker '{}' panicked", self.id);
                     self.tx.send(Signal::Terminated(self.id.clone()));
+                    self.sync_state();
                     resume_unwind(e)
                 }
                 Ok(r) => {
@@ -140,6 +134,17 @@ impl SidekiqWorker {
         } else {
             warn!("unknown job class '{}'", job.class);
             Ok(())
+        }
+    }
+
+    fn sync_state(&self) {
+        if self.processed != 0 {
+            self.tx.send(Signal::Complete(self.id.clone(), self.processed));
+            self.processed = 0;
+        }
+        if self.failed != 0 {
+            self.tx.send(Signal::Fail(self.id.clone(), self.failed));
+            self.failed = 0;
         }
     }
 
