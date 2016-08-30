@@ -101,7 +101,7 @@ impl<'a> SidekiqServer<'a> {
 
         // controller loop
         let (tox2, rsx2) = (tox.clone(), rsx.clone()); // rename channels cuz `chan_select!` will rename'em below
-        let clock = tick(Duration::from_secs(5)); // report to sidekiq every 5 secs
+        let clock = tick(Duration::from_secs(2)); // report to sidekiq every 5 secs
         loop {
             let _ = self.report_alive();
             chan_select! {
