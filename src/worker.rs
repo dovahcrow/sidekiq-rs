@@ -123,7 +123,14 @@ impl SidekiqWorker {
                 Err(e) => {
                     error!("Worker '{}' panicked", self.id);
                     self.tx.send(Signal::Terminated(self.id.clone()));
-                    self.sync_state();
+                    if self.processed != 0 {
+                        self.tx.send(Signal::Complete(self.id.clone(), self.processed));
+                        self.processed = 0;
+                    }
+                    if self.failed != 0 {
+                        self.tx.send(Signal::Fail(self.id.clone(), self.failed));
+                        self.failed = 0;
+                    }
                     resume_unwind(e)
                 }
                 Ok(r) => {
@@ -137,7 +144,7 @@ impl SidekiqWorker {
         }
     }
 
-    fn sync_state(&self) {
+    fn sync_state(&mut self) {
         if self.processed != 0 {
             self.tx.send(Signal::Complete(self.id.clone(), self.processed));
             self.processed = 0;
