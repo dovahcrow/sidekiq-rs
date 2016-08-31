@@ -18,8 +18,23 @@ pub struct Job {
     pub created_at: f64,
     pub enqueued_at: f64,
     pub extra: BTreeMap<String, JValue>,
+    pub namespace: String,
 }
 
+impl Job {
+    #[cfg_attr(feature="flame_it", flame)]
+    fn with_namespace(&self, snippet: &str) -> String {
+        if self.namespace == "" {
+            snippet.into()
+        } else {
+            self.namespace.clone() + ":" + snippet
+        }
+    }
+    #[cfg_attr(feature="flame_it", flame)]
+    pub fn queue_name(&self) -> String {
+        self.with_namespace(&("queue:".to_string() + &self.queue))
+    }
+}
 
 impl Deserialize for Job {
     fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
@@ -74,6 +89,7 @@ impl Deserialize for Job {
                     obj.remove("enqueued_at");
                     obj
                 },
+                namespace: "".into(),
             })
         } else {
             Err(D::Error::custom("not an object"))

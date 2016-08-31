@@ -1,88 +1,47 @@
 use ::job::Job;
-use std::error::Error;
-use std::fmt::{Display, Formatter, Result as FmtResult};
-use std::marker::Sync;
+use errors::{ErrorKind, Result};
 
-
-#[derive(Debug)]
-pub struct JobHandlerError(pub Box<Error + Send>);
-
-impl Error for JobHandlerError {
-    fn description(&self) -> &str {
-        &self.0.description()
-    }
-}
-
-impl Display for JobHandlerError {
-    fn fmt(&self, fmt: &mut Formatter) -> FmtResult {
-        write!(fmt, "{:?}", self)
-    }
-}
-
-
-
-pub trait JobHandlerFactory {
-    fn produce(&mut self) -> Box<JobHandler>;
-}
+pub type JobHandlerResult = Result<()>;
 
 pub trait JobHandler: Send {
-    fn handle(&mut self, job: &Job) -> Result<(), JobHandlerError>;
+    fn handle(&mut self, job: &Job) -> JobHandlerResult;
+    fn cloned(&mut self) -> Box<JobHandler>;
 }
 
-
-pub struct PrinterHandlerFactory;
-
-impl JobHandlerFactory for PrinterHandlerFactory {
-    fn produce(&mut self) -> Box<JobHandler> {
-        Box::new(PrinterHandler)
-    }
-}
-
+#[derive(Clone)]
 pub struct PrinterHandler;
 
-unsafe impl Sync for PrinterHandler {}
-
 impl JobHandler for PrinterHandler {
-    fn handle(&mut self, job: &Job) -> Result<(), JobHandlerError> {
+    fn handle(&mut self, job: &Job) -> JobHandlerResult {
         info!("handling {:?}", job);
         Ok(())
     }
-}
-
-
-pub struct ErrorHandlerFactory;
-
-impl JobHandlerFactory for ErrorHandlerFactory {
-    fn produce(&mut self) -> Box<JobHandler> {
-        Box::new(ErrorHandler)
+    fn cloned(&mut self) -> Box<JobHandler> {
+        Box::new(self.clone())
     }
 }
 
+#[derive(Clone)]
 pub struct ErrorHandler;
 
-unsafe impl Sync for ErrorHandler {}
 
 impl JobHandler for ErrorHandler {
-    fn handle(&mut self, _: &Job) -> Result<(), JobHandlerError> {
-        Err(JobHandlerError(Box::new("a".parse::<i8>().unwrap_err())))
+    fn handle(&mut self, _: &Job) -> JobHandlerResult {
+        Err(ErrorKind::JobHandlerError(Box::new("a".parse::<i8>().unwrap_err())).into())
+    }
+    fn cloned(&mut self) -> Box<JobHandler> {
+        Box::new(self.clone())
     }
 }
 
-
-pub struct PanicHandlerFactory;
-
-impl JobHandlerFactory for PanicHandlerFactory {
-    fn produce(&mut self) -> Box<JobHandler> {
-        Box::new(PanicHandler)
-    }
-}
-
+#[derive(Clone)]
 pub struct PanicHandler;
 
-unsafe impl Sync for PanicHandler {}
-
 impl JobHandler for PanicHandler {
-    fn handle(&mut self, _: &Job) -> Result<(), JobHandlerError> {
+    fn handle(&mut self, _: &Job) -> JobHandlerResult {
         panic!("yeah, I do it deliberately")
+    }
+    fn cloned(&mut self) -> Box<JobHandler> {
+        Box::new(self.clone())
     }
 }

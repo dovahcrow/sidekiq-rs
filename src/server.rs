@@ -1,24 +1,27 @@
-use ::job_handler::JobHandlerFactory;
-
 use std::collections::BTreeMap;
+use std::time::Duration;
 
-use ::errors::*;
-use ::utils::rust_gethostname;
-
-use chrono::UTC;
 use r2d2::{Pool, Config};
 use r2d2_redis::RedisConnectionManager;
+
 use rand::Rng;
+
 use threadpool::ThreadPool;
-use worker::SidekiqWorker;
+
 use redis::Commands;
 
 use chan::{sync, after, tick, Receiver, Sender};
 use chan_signal::{Signal as SysSignal, notify};
 
-use std::time::Duration;
-
 use libc::getpid;
+
+use chrono::UTC;
+
+use worker::SidekiqWorker;
+use errors::*;
+use utils::rust_gethostname;
+use middleware::MiddleWare;
+use job_handler::JobHandler;
 
 #[derive(Debug)]
 pub enum Signal {
@@ -36,7 +39,8 @@ pub struct SidekiqServer<'a> {
     redispool: Pool<RedisConnectionManager>,
     threadpool: ThreadPool,
     pub namespace: String,
-    job_handler_factories: BTreeMap<String, &'a mut JobHandlerFactory>,
+    job_handlers: BTreeMap<String, &'a mut JobHandler>,
+    middlewares: Vec<&'a mut MiddleWare>,
     queues: Vec<String>,
     weights: Vec<f64>,
     started_at: f64,
@@ -63,7 +67,7 @@ impl<'a> SidekiqServer<'a> {
             redispool: pool,
             threadpool: ThreadPool::new_with_name("worker".into(), concurrency),
             namespace: String::new(),
-            job_handler_factories: BTreeMap::new(),
+            job_handlers: BTreeMap::new(),
             queues: vec![],
             weights: vec![],
             started_at: now.timestamp() as f64 + now.timestamp_subsec_micros() as f64 / 1000000f64,
@@ -72,6 +76,7 @@ impl<'a> SidekiqServer<'a> {
             concurrency: concurrency,
             signal_chan: signal,
             force_quite_timeout: 10,
+            middlewares: vec![],
             // random itentity
             rs: ::rand::thread_rng().gen_ascii_chars().take(12).collect(),
         }
@@ -82,8 +87,12 @@ impl<'a> SidekiqServer<'a> {
         self.weights.push(weight as f64);
     }
 
-    pub fn attach_handler_factory(&mut self, name: &str, handle: &'a mut JobHandlerFactory) {
-        self.job_handler_factories.insert(name.into(), handle);
+    pub fn attach_handler(&mut self, name: &str, handle: &'a mut JobHandler) {
+        self.job_handlers.insert(name.into(), handle);
+    }
+
+    pub fn attach_middleware(&mut self, factory: &'a mut MiddleWare) {
+        self.middlewares.push(factory);
     }
 
     pub fn start(&mut self) {
@@ -158,13 +167,11 @@ impl<'a> SidekiqServer<'a> {
                                         rox,
                                         self.queues.clone(),
                                         self.weights.clone(),
-                                        self.job_handler_factories
+                                        self.job_handlers
                                             .iter_mut()
-                                            .map(|(k, v): (&String,
-                                                           &mut &mut JobHandlerFactory)| {
-                                                (k.clone(), v.produce())
-                                            })
+                                            .map(|(k, v)| (k.clone(), v.cloned()))
                                             .collect(),
+                                        self.middlewares.iter_mut().map(|v| v.cloned()).collect(),
                                         self.namespace.clone());
         self.worker_info.insert(worker.id.clone(), false);
         self.threadpool.execute(move || worker.work());

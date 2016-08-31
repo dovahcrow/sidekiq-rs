@@ -1,38 +1,47 @@
+
+use std::panic::{catch_unwind, AssertUnwindSafe};
+
+use std::time::Duration;
+use std::collections::BTreeMap;
+
 use random_choice::random_choice;
-use server::{Signal, Operation};
+
 use chan::{Sender, Receiver, tick};
 use r2d2_redis::RedisConnectionManager;
 use r2d2::Pool;
-use job::Job;
+
 use serde_json::from_str;
 use errors::*;
 use redis::Commands;
-use std::collections::BTreeMap;
-use job_handler::JobHandler;
+
+
 use rand::Rng;
 use json::parse;
 use serde_json::to_string;
 use chrono::UTC;
 
-use std::panic::{catch_unwind, AssertUnwindSafe};
+use server::{Signal, Operation};
+use job::Job;
+use job_handler::{JobHandler, JobHandlerResult};
+use middleware::MiddleWare;
 
-use std::time::Duration;
 
-pub struct SidekiqWorker {
+pub struct SidekiqWorker<'a> {
     pub id: String,
     server_id: String,
     pool: Pool<RedisConnectionManager>,
     namespace: String,
     queues: Vec<String>,
     weights: Vec<f64>,
-    handlers: BTreeMap<String, Box<JobHandler>>,
+    handlers: BTreeMap<String, Box<JobHandler + 'a>>,
+    middlewares: Vec<Box<MiddleWare + 'a>>,
     tx: Sender<Signal>,
     rx: Receiver<Operation>,
     processed: usize,
     failed: usize,
 }
 
-impl SidekiqWorker {
+impl<'a> SidekiqWorker<'a> {
     pub fn new(server_id: &str,
                pool: Pool<RedisConnectionManager>,
                tx: Sender<Signal>,
@@ -40,8 +49,9 @@ impl SidekiqWorker {
                queues: Vec<String>,
                weights: Vec<f64>,
                handlers: BTreeMap<String, Box<JobHandler>>,
+               middlewares: Vec<Box<MiddleWare>>,
                namespace: String)
-               -> SidekiqWorker {
+               -> SidekiqWorker<'a> {
         SidekiqWorker {
             id: ::rand::thread_rng().gen_ascii_chars().take(9).collect(),
             server_id: server_id.into(),
@@ -50,6 +60,7 @@ impl SidekiqWorker {
             queues: queues,
             weights: weights,
             handlers: handlers,
+            middlewares: middlewares,
             tx: tx,
             rx: rx,
             processed: 0,
@@ -104,10 +115,11 @@ impl SidekiqWorker {
         let result: Option<Vec<String>> = try!(try!(self.pool.get()).brpop(&queue_name, 2));
 
         if let Some(result) = result {
-            let job: Job = try!(from_str(&result[1]));
+            let mut job: Job = try!(from_str(&result[1]));
             self.tx.send(Signal::Acquire(self.id.clone()));
+            job.namespace = self.namespace.clone();
             try!(self.report_working(&job));
-            try!(self.perform(&job));
+            try!(self.perform(job));
             try!(self.report_done());
             Ok(true)
         } else {
@@ -116,23 +128,47 @@ impl SidekiqWorker {
     }
 
     #[cfg_attr(feature="flame_it", flame)]
-    fn perform(&mut self, job: &Job) -> Result<()> {
+    fn perform(&mut self, job: Job) -> Result<()> {
         debug!("job is {:?}", job);
-        if let Some(handler) = self.handlers.get_mut(&job.class) {
-            match catch_unwind(AssertUnwindSafe(|| handler.handle(&job))) {
-                Err(_) => {
-                    error!("Worker '{}' panicked, recovering", self.id);
-                    Err("Worker crashed".into())
-                }
-                Ok(r) => {
-                    try!(r);
-                    Ok(())
-                }
-            }
+
+        let mut handler = if let Some(handler) = self.handlers.get_mut(&job.class) {
+            handler.cloned()
         } else {
             warn!("unknown job class '{}'", job.class);
-            Ok(())
+            return Ok(());
+        };
+
+        match catch_unwind(AssertUnwindSafe(|| {
+            self.call_middleware(job, |job| handler.handle(job))
+        })) {
+            Err(_) => {
+                error!("Worker '{}' panicked, recovering", self.id);
+                Err("Worker crashed".into())
+            }
+            Ok(r) => {
+                try!(r);
+                Ok(())
+            }
         }
+    }
+
+    fn call_middleware<F>(&self, mut job: Job, mut handle: F) -> Result<()>
+        where F: FnMut(&Job) -> JobHandlerResult
+    {
+        fn imp<'a>(job: &mut Job,
+                   redis: Pool<RedisConnectionManager>,
+                   chain: &[Box<MiddleWare + 'a>],
+                   mut handle: &mut FnMut(&Job) -> JobHandlerResult)
+                   -> Result<()> {
+            if chain.len() == 0 {
+                handle(&job)
+            } else {
+                chain[0].handle(job,
+                                redis,
+                                &mut |job, redis| imp(job, redis, &chain[1..], handle))
+            }
+        }
+        imp(&mut job, self.pool.clone(), &self.middlewares, &mut handle)
     }
 
     fn sync_state(&mut self) {

@@ -40,10 +40,9 @@ pub mod errors;
 mod job;
 mod utils;
 mod worker;
-
+mod middleware;
 
 pub use server::SidekiqServer;
-pub use job_handler::{PrinterHandlerFactory, ErrorHandlerFactory, JobHandlerFactory,
-                      PanicHandlerFactory, JobHandler, JobHandlerError};
-
+pub use job_handler::{JobHandler, JobHandlerResult, PrinterHandler, ErrorHandler, PanicHandler};
+pub use middleware::{MiddleWare, MiddleWareResult, PeekMiddleWare};
 pub use job::Job;
