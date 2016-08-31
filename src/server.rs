@@ -245,7 +245,7 @@ impl<'a> SidekiqServer<'a> {
                 self.worker_info.remove(&id);
             }
         }
-        debug!("signal dealt {:?}", sig);
+        debug!("signal dealt");
     }
 
     // Sidekiq dashboard reporting functions

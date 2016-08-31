@@ -114,7 +114,7 @@ impl<'a> SidekiqWorker<'a> {
     #[cfg_attr(feature="flame_it", flame)]
     fn run_queue_once(&mut self, name: &str) -> Result<bool> {
         let queue_name = self.queue_name(name);
-        debug!("queue name '{}'", queue_name);
+        debug!("{}: queue name '{}'", self.id, queue_name);
 
         let result: Option<Vec<String>> = try!(try!(self.pool.get()).brpop(&queue_name, 2));
 
@@ -133,7 +133,7 @@ impl<'a> SidekiqWorker<'a> {
 
     #[cfg_attr(feature="flame_it", flame)]
     fn perform(&mut self, job: Job) -> Result<()> {
-        debug!("job is {:?}", job);
+        debug!("{}: job is {:?}", self.id, job);
 
         let mut handler = if let Some(handler) = self.handlers.get_mut(&job.class) {
             handler.cloned()
