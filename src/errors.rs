@@ -8,9 +8,9 @@ error_chain!{
          ::job_handler::JobHandlerError, JobHandlerError; 
     }
     errors {
-         RubyExceptionError(t: String) {
-             description("meet ruby exception")
-             display("meet ruby exception")
+         WorkerError(t: String) {
+             description("Worker Error")
+             display("Worker Error '{}'", t)
          }
     }
 }
