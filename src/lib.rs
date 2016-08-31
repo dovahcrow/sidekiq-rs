@@ -44,5 +44,5 @@ mod middleware;
 
 pub use server::SidekiqServer;
 pub use job_handler::{JobHandler, JobHandlerResult, PrinterHandler, ErrorHandler, PanicHandler};
-pub use middleware::{MiddleWare, MiddleWareResult, PeekMiddleWare};
+pub use middleware::{MiddleWare, MiddleWareResult, PeekMiddleWare, RetryMiddleWare};
 pub use job::Job;
