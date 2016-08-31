@@ -81,6 +81,7 @@ impl<'a> SidekiqWorker<'a> {
                         let v = choice.random_choice_f64(&self.queues, &self.weights, 1);
                         v[0].clone()
                     };
+                    debug!("{} run queue once", self.id);
                     match self.run_queue_once(&queue_name) {
                         Ok(true) => self.processed += 1,
                         Ok(false) => {}
@@ -92,6 +93,7 @@ impl<'a> SidekiqWorker<'a> {
                 },
                 clock.recv() => {
                     // synchronize state
+                    debug!("{} syncing state", self.id);
                     self.sync_state();
                 },
                 rx.recv() -> op => {
@@ -173,10 +175,12 @@ impl<'a> SidekiqWorker<'a> {
 
     fn sync_state(&mut self) {
         if self.processed != 0 {
+            debug!("{} sending complete signal", self.id);
             self.tx.send(Signal::Complete(self.id.clone(), self.processed));
             self.processed = 0;
         }
         if self.failed != 0 {
+            debug!("{} sending fail signal", self.id);
             self.tx.send(Signal::Fail(self.id.clone(), self.failed));
             self.failed = 0;
         }

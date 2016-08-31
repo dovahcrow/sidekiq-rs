@@ -59,7 +59,7 @@ impl<'a> SidekiqServer<'a> {
         let signal = notify(&[SysSignal::INT, SysSignal::USR1]); // should be here to set proper signal mask to all threads
         let now = UTC::now();
         let config = Config::builder()
-            .pool_size(concurrency as u32 + 2) // dunno why, it corrupt for unable to get connection sometimes with concurrency + 1
+            .pool_size(concurrency as u32 + 1) // dunno why, it corrupt for unable to get connection sometimes with concurrency + 1
             .build();
         let manager = RedisConnectionManager::new(redis).unwrap();
         let pool = Pool::new(config, manager).unwrap();
@@ -130,7 +130,9 @@ impl<'a> SidekiqServer<'a> {
                         None => { unimplemented!() }
                     }
                 },
-                clock.recv() => {},
+                clock.recv() => {
+                    debug!("server clock triggered");
+                },
                 rsx.recv() -> sig => {
                     debug!("received signal {:?}", sig);
                     sig.map(|s| self.deal_signal(s));
