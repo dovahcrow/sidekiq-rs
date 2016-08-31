@@ -25,7 +25,6 @@ random_choice = "0.3.0"
 redis = "0.6.0"
 serde = "0.8"
 serde_json = "0.8"
-thread-id = "2.0.0"
 threadpool = "1.0.0"
 flame = { version = "0.1.8", optional = true }
 flamer = { version = "0.1.2", optional = true }

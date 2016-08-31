@@ -18,7 +18,6 @@ extern crate env_logger;
 extern crate error_chain;
 
 extern crate threadpool;
-extern crate thread_id;
 
 extern crate redis;
 extern crate r2d2;
