@@ -51,6 +51,6 @@ Server will not accept anymore jobs if either signal received.
 - [x] Sidekiq dashboard capability.
 - [x] Exit signal handling.
 - [x] Support arbitrary fields in job object.
-- [ ] Middleware support.
-- [ ] Job retry support.
+- [x] Middleware support.
+- [x] Job retry support.
 - [ ] Scheduled job support.
