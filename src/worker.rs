@@ -95,11 +95,13 @@ impl<'a> SidekiqWorker<'a> {
                     // synchronize state
                     debug!("{} syncing state", self.id);
                     self.sync_state();
+                    debug!("{} syncing state done", self.id);
                 },
                 rx.recv() -> op => {
                     if let Some(Operation::Terminate) = op {
                         info!("{}: Terminate signal received, exiting...", self.id);
                         self.tx.send(Signal::Terminated(self.id.clone()));
+                        debug!("{}: Terminate signal sent", self.id);
                         return;
                     } else {
                         unimplemented!()

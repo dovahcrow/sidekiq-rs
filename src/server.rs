@@ -228,6 +228,7 @@ impl<'a> SidekiqServer<'a> {
 
     #[cfg_attr(feature="flame_it", flame)]
     fn deal_signal(&mut self, sig: Signal) {
+        debug!("dealing signal {:?}", sig);
         match sig {
             Signal::Complete(id, n) => {
                 let _ = self.report_processed(n);
@@ -244,6 +245,7 @@ impl<'a> SidekiqServer<'a> {
                 self.worker_info.remove(&id);
             }
         }
+        debug!("signal dealt {:?}", sig);
     }
 
     // Sidekiq dashboard reporting functions
