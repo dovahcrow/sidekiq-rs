@@ -57,7 +57,7 @@ impl MiddleWare for RetryMiddleWare {
                     Ok(())
                 }
                 USize(u) if u > 0 => {
-                    warn!("Job '{:?}' failed with '{}', retrying",
+                    warn!("'{:?}' failed with '{}', retrying",
                           job,
                           r.as_ref().unwrap_err());
                     job.retry = USize(u - 1);
@@ -71,6 +71,6 @@ impl MiddleWare for RetryMiddleWare {
         }
     }
     fn cloned(&mut self) -> Box<MiddleWare> {
-        Box::new(PeekMiddleWare)
+        Box::new(RetryMiddleWare)
     }
 }
