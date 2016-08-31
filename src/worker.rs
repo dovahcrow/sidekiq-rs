@@ -14,7 +14,7 @@ use json::parse;
 use serde_json::to_string;
 use chrono::UTC;
 
-use std::panic::{catch_unwind, resume_unwind, AssertUnwindSafe};
+use std::panic::{catch_unwind, AssertUnwindSafe};
 
 use std::time::Duration;
 
@@ -120,24 +120,15 @@ impl SidekiqWorker {
         debug!("job is {:?}", job);
         if let Some(handler) = self.handlers.get_mut(&job.class) {
             match catch_unwind(AssertUnwindSafe(|| handler.handle(&job))) {
-                Err(e) => {
-                    error!("Worker '{}' panicked", self.id);
-                    self.tx.send(Signal::Terminated(self.id.clone()));
-                    if self.processed != 0 {
-                        self.tx.send(Signal::Complete(self.id.clone(), self.processed));
-                        self.processed = 0;
-                    }
-                    if self.failed != 0 {
-                        self.tx.send(Signal::Fail(self.id.clone(), self.failed));
-                        self.failed = 0;
-                    }
-                    resume_unwind(e)
+                Err(_) => {
+                    error!("Worker '{}' panicked, recovering", self.id);
+                    Err("Worker crashed".into())
                 }
                 Ok(r) => {
                     try!(r);
+                    Ok(())
                 }
             }
-            Ok(())
         } else {
             warn!("unknown job class '{}'", job.class);
             Ok(())

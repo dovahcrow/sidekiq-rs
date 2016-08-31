@@ -18,7 +18,7 @@ use chan_signal::{Signal as SysSignal, notify};
 
 use std::time::Duration;
 
-use thread_id;
+use libc::getpid;
 
 #[derive(Debug)]
 pub enum Signal {
@@ -61,13 +61,13 @@ impl<'a> SidekiqServer<'a> {
         let pool = Pool::new(config, manager).unwrap();
         SidekiqServer {
             redispool: pool,
-            threadpool: ThreadPool::new(concurrency),
+            threadpool: ThreadPool::new_with_name("worker".into(), concurrency),
             namespace: String::new(),
             job_handler_factories: BTreeMap::new(),
             queues: vec![],
             weights: vec![],
             started_at: now.timestamp() as f64 + now.timestamp_subsec_micros() as f64 / 1000000f64,
-            pid: thread_id::get(),
+            pid: unsafe { getpid() } as usize,
             worker_info: BTreeMap::new(),
             concurrency: concurrency,
             signal_chan: signal,
@@ -125,7 +125,7 @@ impl<'a> SidekiqServer<'a> {
                 rsx.recv() -> sig => {
                     debug!("received signal {:?}", sig);
                     sig.map(|s| self.deal_signal(s));
-                    let worker_count = self.worker_info.len();
+                    let worker_count = self.threadpool.active_count();
                     // relaunch workers if they died unexpectly
                     if worker_count < self.concurrency {
                         warn!("worker down, restarting");
