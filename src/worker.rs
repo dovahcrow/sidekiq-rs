@@ -82,7 +82,7 @@ impl<'a> SidekiqWorker<'a> {
                         v[0].clone()
                     };
                     match self.run_queue_once(&queue_name) {
-                        Ok(true) => self.processed +=1,
+                        Ok(true) => self.processed += 1,
                         Ok(false) => {}
                         Err(e) => {
                             self.failed += 1;
