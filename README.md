@@ -17,7 +17,7 @@ and enqueue jobs in ruby and done jobs in rust.
 
 ## Usage:
 
-1. Implementing your own `JobHandler` and `JobHandlerFactory`
+1. Implementing your own `JobHandler`
 2. Instantiate a sidekiq-rs server and insert your own job handlers
 3. Set up dummy jobs with same name as your job handlers in ruby
 4. Run sidekiq-rs server and submit jobs from ruby
@@ -53,6 +53,7 @@ Server will not accept anymore jobs if either signal received.
 - [x] Support arbitrary fields in job object.
 - [x] Middleware support.
 - [x] Job retry support via middleware.
+- [ ] Documentation.
 - [ ] Unique job support via middleware.
 - [ ] Ruby code handler
 - [ ] Regex handler matching.
