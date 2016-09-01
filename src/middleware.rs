@@ -2,10 +2,11 @@ use serde_json::to_string;
 use chrono::UTC;
 
 use ::RedisPool;
+use ::JobSuccessType;
 use errors::Result;
 use job::Job;
 
-pub type MiddleWareResult = Result<()>;
+pub type MiddleWareResult = Result<JobSuccessType>;
 pub type NextFunc<'a> = &'a mut (FnMut(&mut Job, RedisPool) -> MiddleWareResult + 'a);
 
 pub trait MiddleWare: Send {
@@ -36,32 +37,31 @@ impl MiddleWare for RetryMiddleWare {
         use job::BoolOrUSize::*;
         let conn = redis.get().unwrap();
         let r = next(job, redis);
-        if r.is_err() {
-            match job.retry {
-                Bool(true) => {
-                    warn!("Job '{:?}' failed with '{}', retrying",
-                          job,
-                          r.as_ref().unwrap_err());
-                    job.retry = Bool(false);
-                    try!(conn.lpush(job.queue_name(), to_string(job).unwrap()));
+        match r {
+            Err(e) => {
+                match job.retry {
+                    Bool(true) => {
+                        warn!("Job '{:?}' failed with '{}', retrying", job, e);
+                        job.retry = Bool(false);
+                        try!(conn.lpush(job.queue_name(), to_string(job).unwrap()));
+                        Ok(JobSuccessType::Ignore)
+                    }
+                    USize(u) if u > 0 => {
+                        warn!("'{:?}' failed with '{}', retrying", job, e);
+                        job.retry = USize(u - 1);
+                        try!(conn.lpush(job.queue_name(), to_string(job).unwrap()));
+                        Ok(JobSuccessType::Ignore)
+                    }
+                    _ => Err(e),
                 }
-                USize(u) if u > 0 => {
-                    warn!("'{:?}' failed with '{}', retrying",
-                          job,
-                          r.as_ref().unwrap_err());
-                    job.retry = USize(u - 1);
-                    try!(conn.lpush(job.queue_name(), to_string(job).unwrap()));
-                }
-                _ => {}
             }
+            Ok(o) => Ok(o),
         }
-        r
     }
     fn cloned(&mut self) -> Box<MiddleWare> {
         Box::new(RetryMiddleWare)
     }
 }
-
 
 pub struct TimeElapseMiddleWare;
 

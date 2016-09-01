@@ -23,6 +23,7 @@ use job::Job;
 use job_handler::{JobHandler, JobHandlerResult};
 use middleware::MiddleWare;
 use ::RedisPool;
+use ::JobSuccessType;
 
 
 pub struct SidekiqWorker<'a> {
@@ -122,23 +123,26 @@ impl<'a> SidekiqWorker<'a> {
             self.tx.send(Signal::Acquire(self.id.clone()));
             job.namespace = self.namespace.clone();
             try!(self.report_working(&job));
-            try!(self.perform(job));
+            let r = try!(self.perform(job));
             try!(self.report_done());
-            Ok(true)
+            match r {
+                JobSuccessType::Ignore => Ok(false),
+                JobSuccessType::Success => Ok(true),
+            }
         } else {
             Ok(false)
         }
     }
 
     #[cfg_attr(feature="flame_it", flame)]
-    fn perform(&mut self, job: Job) -> Result<()> {
+    fn perform(&mut self, job: Job) -> Result<JobSuccessType> {
         debug!("{}: job is {:?}", self.id, job);
 
         let mut handler = if let Some(handler) = self.handlers.get_mut(&job.class) {
             handler.cloned()
         } else {
             warn!("unknown job class '{}'", job.class);
-            return Ok(());
+            return Err("unknown job class".into());
         };
 
         match catch_unwind(AssertUnwindSafe(|| {
@@ -148,21 +152,18 @@ impl<'a> SidekiqWorker<'a> {
                 error!("Worker '{}' panicked, recovering", self.id);
                 Err("Worker crashed".into())
             }
-            Ok(r) => {
-                try!(r);
-                Ok(())
-            }
+            Ok(r) => Ok(try!(r)),
         }
     }
 
-    fn call_middleware<F>(&self, mut job: Job, mut handle: F) -> Result<()>
+    fn call_middleware<F>(&self, mut job: Job, mut handle: F) -> Result<JobSuccessType>
         where F: FnMut(&Job) -> JobHandlerResult
     {
         fn imp<'a>(job: &mut Job,
                    redis: RedisPool,
                    chain: &[Box<MiddleWare + 'a>],
                    mut handle: &mut FnMut(&Job) -> JobHandlerResult)
-                   -> Result<()> {
+                   -> Result<JobSuccessType> {
             if chain.len() == 0 {
                 handle(&job)
             } else {

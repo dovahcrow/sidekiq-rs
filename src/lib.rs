@@ -52,3 +52,9 @@ pub use middleware::{MiddleWare, MiddleWareResult, PeekMiddleWare, RetryMiddleWa
                      TimeElapseMiddleWare, NextFunc};
 pub use job::Job;
 pub type RedisPool = Pool<RedisConnectionManager>;
+
+#[derive(Debug, Clone)]
+pub enum JobSuccessType {
+    Success,
+    Ignore,
+}

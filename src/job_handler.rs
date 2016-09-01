@@ -1,7 +1,9 @@
-use ::job::Job;
+use job::Job;
+use ::JobSuccessType;
+use ::JobSuccessType::*;
 use errors::{ErrorKind, Result};
 
-pub type JobHandlerResult = Result<()>;
+pub type JobHandlerResult = Result<JobSuccessType>;
 
 pub trait JobHandler: Send {
     fn handle(&mut self, job: &Job) -> JobHandlerResult;
@@ -14,7 +16,7 @@ pub struct PrinterHandler;
 impl JobHandler for PrinterHandler {
     fn handle(&mut self, job: &Job) -> JobHandlerResult {
         info!("handling {:?}", job);
-        Ok(())
+        Ok(Success)
     }
     fn cloned(&mut self) -> Box<JobHandler> {
         Box::new(self.clone())
