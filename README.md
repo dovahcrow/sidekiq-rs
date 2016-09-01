@@ -52,5 +52,7 @@ Server will not accept anymore jobs if either signal received.
 - [x] Exit signal handling.
 - [x] Support arbitrary fields in job object.
 - [x] Middleware support.
-- [x] Job retry support.
-- [ ] Unique job support.
+- [x] Job retry support via middleware.
+- [ ] Unique job support via middleware.
+- [ ] Ruby code handler
+- [ ] Regex handler matching.
