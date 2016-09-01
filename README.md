@@ -1,4 +1,4 @@
-Sidekiq-rs [![Build Status](https://travis-ci.org/doomsplayer/sidekiq-rs.svg?branch=master)](https://travis-ci.org/doomsplayer/sidekiq-rs) [![Crates.io](https://img.shields.io/crates/v/sidekiq-rs.svg?maxAge=2592000)](https://crates.io/crates/sidekiq-rs) [![Crates.io](https://img.shields.io/crates/dv/sidekiq-rs.svg?maxAge=2592000)](https://crates.io/crates/sidekiq-rs) [![Crates.io](https://img.shields.io/crates/l/sidekiq-rs.svg?maxAge=2592000)](https://crates.io/crates/sidekiq-rs)
+Sidekiq-rs [![Build Status](https://travis-ci.org/doomsplayer/sidekiq-rs.svg?branch=master)](https://travis-ci.org/doomsplayer/sidekiq-rs) [![Crates.io](https://img.shields.io/crates/v/sidekiq-rs.svg?maxAge=86400)](https://crates.io/crates/sidekiq-rs) [![Crates.io](https://img.shields.io/crates/dv/sidekiq-rs.svg?maxAge=86400)](https://crates.io/crates/sidekiq-rs) [![Crates.io](https://img.shields.io/crates/l/sidekiq-rs.svg?maxAge=86400)](https://crates.io/crates/sidekiq-rs)
 ====
 
 Sidekiq compatible server in rust, which behaviours totally
