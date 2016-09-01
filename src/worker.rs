@@ -192,16 +192,16 @@ impl<'a> SidekiqWorker<'a> {
 
     #[cfg_attr(feature="flame_it", flame)]
     fn report_working(&self, job: &Job) -> Result<()> {
+        let conn = try!(self.pool.get());
         let payload = object! {
             "queue" => job.queue.clone(),
             "payload" => parse(&to_string(job).unwrap()).unwrap(),
             "run_at" => UTC::now().timestamp()
         };
-        try!(try!(self.pool.get()).hset(&self.with_namespace(&self.with_server_id("workers")),
-                                        &self.id,
-                                        payload.dump()));
-        let _ = try!(try!(self.pool.get())
-            .expire(&self.with_namespace(&self.with_server_id("workers")), 5));
+        try!(conn.hset(&self.with_namespace(&self.with_server_id("workers")),
+                       &self.id,
+                       payload.dump()));
+        let _ = try!(conn.expire(&self.with_namespace(&self.with_server_id("workers")), 5));
         Ok(())
     }
 

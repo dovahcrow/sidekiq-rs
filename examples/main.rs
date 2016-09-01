@@ -48,7 +48,7 @@ fn main() {
     let mut handler_panic = PanicHandler;
     let mut middleware_peak = PeekMiddleWare;
     let mut middleware_retry = RetryMiddleWare;
-    let mut server = SidekiqServer::new(&args.flag_redis, args.flag_concurrency);
+    let mut server = SidekiqServer::new(&args.flag_redis, args.flag_concurrency).unwrap();
 
     server.attach_handler("Printer", &mut handler_printer);
     server.attach_handler("Error", &mut handler_error);

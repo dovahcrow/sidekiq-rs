@@ -55,15 +55,15 @@ pub struct SidekiqServer<'a> {
 impl<'a> SidekiqServer<'a> {
     // Interfaces to be exposed
 
-    pub fn new(redis: &str, concurrency: usize) -> Self {
+    pub fn new(redis: &str, concurrency: usize) -> Result<Self> {
         let signal = notify(&[SysSignal::INT, SysSignal::USR1]); // should be here to set proper signal mask to all threads
         let now = UTC::now();
         let config = Config::builder()
-            .pool_size(concurrency as u32 + 1) // dunno why, it corrupt for unable to get connection sometimes with concurrency + 1
+            .pool_size(concurrency as u32 + 3) // dunno why, it corrupt for unable to get connection sometimes with concurrency + 1
             .build();
-        let manager = RedisConnectionManager::new(redis).unwrap();
-        let pool = Pool::new(config, manager).unwrap();
-        SidekiqServer {
+        let manager = try!(RedisConnectionManager::new(redis));
+        let pool = try!(Pool::new(config, manager));
+        Ok(SidekiqServer {
             redispool: pool,
             threadpool: ThreadPool::new_with_name("worker".into(), concurrency),
             namespace: String::new(),
@@ -79,7 +79,7 @@ impl<'a> SidekiqServer<'a> {
             middlewares: vec![],
             // random itentity
             rs: ::rand::thread_rng().gen_ascii_chars().take(12).collect(),
-        }
+        })
     }
 
     pub fn new_queue(&mut self, name: &str, weight: usize) {
@@ -101,8 +101,8 @@ impl<'a> SidekiqServer<'a> {
             error!("queue is empty, exiting");
             return;
         }
-        let (tsx, rsx) = sync(self.concurrency);
-        let (tox, rox) = sync(self.concurrency);
+        let (tsx, rsx) = sync(self.concurrency + 10);
+        let (tox, rox) = sync(self.concurrency + 10);
         let signal = self.signal_chan.clone();
 
         // start worker threads
@@ -112,17 +112,19 @@ impl<'a> SidekiqServer<'a> {
         let (tox2, rsx2) = (tox.clone(), rsx.clone()); // rename channels cuz `chan_select!` will rename'em below
         let clock = tick(Duration::from_secs(2)); // report to sidekiq every 5 secs
         loop {
-            let _ = self.report_alive();
+            if let Err(e) = self.report_alive() {
+                error!("report alive failed: '{}'", e);
+            }
             chan_select! {
                 signal.recv() -> signal => {
                     match signal {
-                        Some(SysSignal::USR1) => {
-                            info!("{:?}: Terminating", signal.unwrap());
+                        Some(signal @ SysSignal::USR1) => {
+                            info!("{:?}: Terminating", signal);
                             self.terminate_gracefully(tox2, rsx2);
                             break;
                         }
-                        Some(SysSignal::INT) => {
-                            info!("{:?}: Force terminating", signal.unwrap());                            
+                        Some(signal @ SysSignal::INT) => {
+                            info!("{:?}: Force terminating", signal);                            
                             self.terminate_forcely(tox2, rsx2);
                             break;
                         }
@@ -135,7 +137,9 @@ impl<'a> SidekiqServer<'a> {
                 },
                 rsx.recv() -> sig => {
                     debug!("received signal {:?}", sig);
-                    sig.map(|s| self.deal_signal(s));
+                    if let Some(Err(e)) = sig.map(|s| self.deal_signal(s)) {
+                        error!("error when dealing signal: '{}'", e);
+                    }
                     let worker_count = self.threadpool.active_count();
                     // relaunch workers if they died unexpectly
                     if worker_count < self.concurrency {
@@ -198,7 +202,9 @@ impl<'a> SidekiqServer<'a> {
                 },
                 rsx.recv() -> sig => {
                     debug!("received signal {:?}", sig);
-                    sig.map(|s| self.deal_signal(s));
+                    if let Some(Err(e)) = sig.map(|s| self.deal_signal(s)) {
+                        error!("error when dealing signal: '{}'", e);
+                    }
                     if self.worker_info.len() == 0 {
                         break
                     }
@@ -217,7 +223,9 @@ impl<'a> SidekiqServer<'a> {
             chan_select! {
                 rsx.recv() -> sig => {
                     debug!("received signal {:?}", sig);
-                    sig.map(|s| self.deal_signal(s));
+                    if let Some(Err(e)) = sig.map(|s| self.deal_signal(s)) {
+                        error!("error when dealing signal: '{}'", e);
+                    }
                     if self.worker_info.len()== 0 {
                         break
                     }
@@ -227,15 +235,15 @@ impl<'a> SidekiqServer<'a> {
     }
 
     #[cfg_attr(feature="flame_it", flame)]
-    fn deal_signal(&mut self, sig: Signal) {
+    fn deal_signal(&mut self, sig: Signal) -> Result<()> {
         debug!("dealing signal {:?}", sig);
         match sig {
             Signal::Complete(id, n) => {
-                let _ = self.report_processed(n);
+                let _ = try!(self.report_processed(n));
                 *self.worker_info.get_mut(&id).unwrap() = false;
             }
             Signal::Fail(id, n) => {
-                let _ = self.report_failed(n);
+                let _ = try!(self.report_failed(n));
                 *self.worker_info.get_mut(&id).unwrap() = false;
             }
             Signal::Acquire(id) => {
@@ -246,6 +254,7 @@ impl<'a> SidekiqServer<'a> {
             }
         }
         debug!("signal dealt");
+        Ok(())
     }
 
     // Sidekiq dashboard reporting functions
@@ -269,41 +278,34 @@ impl<'a> SidekiqServer<'a> {
                             (now.timestamp() as f64 +
                              now.timestamp_subsec_micros() as f64 / 1000000f64)
                                .to_string())];
-
-        let _ = try!(self.redispool
-            .get()
-            .unwrap()
-            .hset_multiple(self.with_namespace(&self.identity()), &content));
-        let _ =
-            try!(self.redispool.get().unwrap().expire(self.with_namespace(&self.identity()), 5));
-        let _ = try!(self.redispool
-            .get()
-            .unwrap()
-            .sadd(self.with_namespace(&"processes"), self.identity()));
+        let conn = try!(self.redispool.get());
+        let _ = try!(conn.hset_multiple(self.with_namespace(&self.identity()), &content));
+        let _ = try!(conn.expire(self.with_namespace(&self.identity()), 5));
+        let _ = try!(conn.sadd(self.with_namespace(&"processes"), self.identity()));
         Ok(())
 
     }
 
     #[cfg_attr(feature="flame_it", flame)]
     fn report_processed(&mut self, n: usize) -> Result<()> {
+        let connection = try!(self.redispool.get());
+
         let key = self.with_namespace(&format!("stat:processed:{}", UTC::now().format("%Y-%m-%d")));
-        let connection = self.redispool.get().unwrap();
         let _ = try!(connection.incr(key, n));
 
         let key = self.with_namespace(&format!("stat:processed"));
-        let connection = self.redispool.get().unwrap();
         let _ = try!(connection.incr(key, n));
         Ok(())
     }
 
     #[cfg_attr(feature="flame_it", flame)]
     fn report_failed(&mut self, n: usize) -> Result<()> {
+        let connection = try!(self.redispool.get());
+
         let key = self.with_namespace(&format!("stat:failed:{}", UTC::now().format("%Y-%m-%d")));
-        let connection = self.redispool.get().unwrap();
         let _ = try!(connection.incr(key, n));
 
         let key = self.with_namespace(&format!("stat:failed"));
-        let connection = self.redispool.get().unwrap();
         let _ = try!(connection.incr(key, n));
         Ok(())
     }

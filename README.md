@@ -53,4 +53,4 @@ Server will not accept anymore jobs if either signal received.
 - [x] Support arbitrary fields in job object.
 - [x] Middleware support.
 - [x] Job retry support.
-- [ ] Scheduled job support.
+- [ ] Unique job support.

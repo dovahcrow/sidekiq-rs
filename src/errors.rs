@@ -5,7 +5,8 @@ error_chain!{
     foreign_links {
          ::redis::RedisError, RedisError;
          ::serde_json::Error, JsonError;
-         ::r2d2::GetTimeout, R2D2Error;
+         ::r2d2::GetTimeout, R2D2TimeoutError;
+         ::r2d2::InitializationError, R2D2InitializerError;
     }
     errors {
          WorkerError(t: String) {
