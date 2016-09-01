@@ -1,4 +1,4 @@
-Sidekiq-rs [![Build Status](https://travis-ci.org/doomsplayer/sidekiq-rs.svg?branch=master)](https://travis-ci.org/doomsplayer/sidekiq-rs) [![Crates.io](https://img.shields.io/crates/v/sidekiq-rs.svg?maxAge=2592000)](https://crates.io/crates/sidekiq-rs) [![Crates.io](https://img.shields.io/crates/dv/sidekiq-rs.svg?maxAge=2592000)](https://crates.io/crates/sidekiq-rs) [![Crates.io](https://img.shields.io/crates/l/sidekiq-rs.svg?maxAge=2592000)](https://crates.io/crates/sidekiq-rs)
+Sidekiq-rs [![Build Status](https://travis-ci.org/doomsplayer/sidekiq-rs.svg?branch=master)](https://travis-ci.org/doomsplayer/sidekiq-rs) [![Crates.io](https://img.shields.io/crates/v/sidekiq-rs.svg?maxAge=86400)](https://crates.io/crates/sidekiq-rs) [![Crates.io](https://img.shields.io/crates/dv/sidekiq-rs.svg?maxAge=86400)](https://crates.io/crates/sidekiq-rs) [![Crates.io](https://img.shields.io/crates/l/sidekiq-rs.svg?maxAge=86400)](https://crates.io/crates/sidekiq-rs)
 ====
 
 Sidekiq compatible server in rust, which behaviours totally
@@ -17,7 +17,7 @@ and enqueue jobs in ruby and done jobs in rust.
 
 ## Usage:
 
-1. Implementing your own `JobHandler` and `JobHandlerFactory`
+1. Implementing your own `JobHandler`
 2. Instantiate a sidekiq-rs server and insert your own job handlers
 3. Set up dummy jobs with same name as your job handlers in ruby
 4. Run sidekiq-rs server and submit jobs from ruby
@@ -52,5 +52,8 @@ Server will not accept anymore jobs if either signal received.
 - [x] Exit signal handling.
 - [x] Support arbitrary fields in job object.
 - [x] Middleware support.
-- [x] Job retry support.
-- [ ] Unique job support.
+- [x] Job retry support via middleware.
+- [ ] Documentation.
+- [ ] Unique job support via middleware.
+- [ ] Ruby code handler
+- [ ] Regex handler matching.
