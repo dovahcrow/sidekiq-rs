@@ -48,6 +48,7 @@ use r2d2_redis::RedisConnectionManager;
 
 pub use server::SidekiqServer;
 pub use job_handler::{JobHandler, JobHandlerResult, PrinterHandler, ErrorHandler, PanicHandler};
-pub use middleware::{MiddleWare, MiddleWareResult, PeekMiddleWare, RetryMiddleWare, NextFunc};
+pub use middleware::{MiddleWare, MiddleWareResult, PeekMiddleWare, RetryMiddleWare,
+                     TimeElapseMiddleWare, NextFunc};
 pub use job::Job;
 pub type RedisPool = Pool<RedisConnectionManager>;
