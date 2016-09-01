@@ -22,6 +22,7 @@ use errors::*;
 use utils::rust_gethostname;
 use middleware::MiddleWare;
 use job_handler::JobHandler;
+use ::RedisPool;
 
 #[derive(Debug)]
 pub enum Signal {
@@ -36,7 +37,7 @@ pub enum Operation {
 }
 
 pub struct SidekiqServer<'a> {
-    redispool: Pool<RedisConnectionManager>,
+    redispool: RedisPool,
     threadpool: ThreadPool,
     pub namespace: String,
     job_handlers: BTreeMap<String, &'a mut JobHandler>,

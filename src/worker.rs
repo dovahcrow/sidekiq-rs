@@ -7,8 +7,6 @@ use std::collections::BTreeMap;
 use random_choice::random_choice;
 
 use chan::{Sender, Receiver, tick};
-use r2d2_redis::RedisConnectionManager;
-use r2d2::Pool;
 
 use serde_json::from_str;
 use errors::*;
@@ -24,12 +22,13 @@ use server::{Signal, Operation};
 use job::Job;
 use job_handler::{JobHandler, JobHandlerResult};
 use middleware::MiddleWare;
+use ::RedisPool;
 
 
 pub struct SidekiqWorker<'a> {
     pub id: String,
     server_id: String,
-    pool: Pool<RedisConnectionManager>,
+    pool: RedisPool,
     namespace: String,
     queues: Vec<String>,
     weights: Vec<f64>,
@@ -43,7 +42,7 @@ pub struct SidekiqWorker<'a> {
 
 impl<'a> SidekiqWorker<'a> {
     pub fn new(server_id: &str,
-               pool: Pool<RedisConnectionManager>,
+               pool: RedisPool,
                tx: Sender<Signal>,
                rx: Receiver<Operation>,
                queues: Vec<String>,
@@ -160,7 +159,7 @@ impl<'a> SidekiqWorker<'a> {
         where F: FnMut(&Job) -> JobHandlerResult
     {
         fn imp<'a>(job: &mut Job,
-                   redis: Pool<RedisConnectionManager>,
+                   redis: RedisPool,
                    chain: &[Box<MiddleWare + 'a>],
                    mut handle: &mut FnMut(&Job) -> JobHandlerResult)
                    -> Result<()> {

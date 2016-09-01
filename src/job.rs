@@ -2,13 +2,13 @@ use serde_json::Value as JValue;
 use std::collections::BTreeMap;
 use serde::{Serialize, Deserialize, Serializer, Deserializer, Error};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum BoolOrUSize {
     Bool(bool),
     USize(usize),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Job {
     pub class: String,
     pub args: Vec<JValue>,
