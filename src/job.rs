@@ -11,12 +11,13 @@ pub enum BoolOrUSize {
 #[derive(Debug, Clone)]
 pub struct Job {
     pub class: String,
-    pub args: Vec<JValue>,
-    pub queue: String,
-    pub retry: BoolOrUSize,
     pub jid: String,
+    pub args: Vec<JValue>,
     pub created_at: f64,
     pub enqueued_at: f64,
+    pub queue: String,
+    pub retry: BoolOrUSize,
+
     pub extra: BTreeMap<String, JValue>,
     pub namespace: String,
 }
