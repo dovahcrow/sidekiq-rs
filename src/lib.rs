@@ -50,7 +50,7 @@ pub use server::SidekiqServer;
 pub use job_handler::{JobHandler, JobHandlerResult, PrinterHandler, ErrorHandler, PanicHandler};
 pub use middleware::{MiddleWare, MiddleWareResult, PeekMiddleWare, RetryMiddleWare,
                      TimeElapseMiddleWare, NextFunc};
-pub use job::Job;
+pub use job::{Job, RetryInfo};
 pub type RedisPool = Pool<RedisConnectionManager>;
 
 #[derive(Debug, Clone)]

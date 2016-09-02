@@ -1,14 +1,13 @@
 use std::collections::BTreeMap;
 use std::time::Duration;
 
+use redis::{Pipeline, PipelineCommands};
 use r2d2::{Pool, Config};
 use r2d2_redis::RedisConnectionManager;
 
 use rand::Rng;
 
 use threadpool::ThreadPool;
-
-use redis::Commands;
 
 use chan::{sync, after, tick, Receiver, Sender};
 use chan_signal::{Signal as SysSignal, notify};
@@ -280,9 +279,12 @@ impl<'a> SidekiqServer<'a> {
                              now.timestamp_subsec_micros() as f64 / 1000000f64)
                                .to_string())];
         let conn = try!(self.redispool.get());
-        let _ = try!(conn.hset_multiple(self.with_namespace(&self.identity()), &content));
-        let _ = try!(conn.expire(self.with_namespace(&self.identity()), 5));
-        let _ = try!(conn.sadd(self.with_namespace(&"processes"), self.identity()));
+        try!(Pipeline::new()
+            .hset_multiple(self.with_namespace(&self.identity()), &content)
+            .expire(self.with_namespace(&self.identity()), 5)
+            .sadd(self.with_namespace(&"processes"), self.identity())
+            .query(&*conn));
+
         Ok(())
 
     }
@@ -290,24 +292,24 @@ impl<'a> SidekiqServer<'a> {
     #[cfg_attr(feature="flame_it", flame)]
     fn report_processed(&mut self, n: usize) -> Result<()> {
         let connection = try!(self.redispool.get());
+        try!(Pipeline::new()
+            .incr(self.with_namespace(&format!("stat:processed:{}",
+                                               UTC::now().format("%Y-%m-%d"))),
+                  n)
+            .incr(self.with_namespace(&format!("stat:processed")), n)
+            .query(&*connection));
 
-        let key = self.with_namespace(&format!("stat:processed:{}", UTC::now().format("%Y-%m-%d")));
-        let _ = try!(connection.incr(key, n));
-
-        let key = self.with_namespace(&format!("stat:processed"));
-        let _ = try!(connection.incr(key, n));
         Ok(())
     }
 
     #[cfg_attr(feature="flame_it", flame)]
     fn report_failed(&mut self, n: usize) -> Result<()> {
         let connection = try!(self.redispool.get());
-
-        let key = self.with_namespace(&format!("stat:failed:{}", UTC::now().format("%Y-%m-%d")));
-        let _ = try!(connection.incr(key, n));
-
-        let key = self.with_namespace(&format!("stat:failed"));
-        let _ = try!(connection.incr(key, n));
+        try!(Pipeline::new()
+            .incr(self.with_namespace(&format!("stat:failed:{}", UTC::now().format("%Y-%m-%d"))),
+                  n)
+            .incr(self.with_namespace(&format!("stat:failed")), n)
+            .query(&*connection));
         Ok(())
     }
 

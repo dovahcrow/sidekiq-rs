@@ -10,7 +10,7 @@ use chan::{Sender, Receiver, tick};
 
 use serde_json::from_str;
 use errors::*;
-use redis::Commands;
+use redis::{Commands, PipelineCommands, Pipeline};
 
 
 use rand::Rng;
@@ -198,10 +198,13 @@ impl<'a> SidekiqWorker<'a> {
             "payload" => parse(&to_string(job).unwrap()).unwrap(),
             "run_at" => UTC::now().timestamp()
         };
-        try!(conn.hset(&self.with_namespace(&self.with_server_id("workers")),
-                       &self.id,
-                       payload.dump()));
-        let _ = try!(conn.expire(&self.with_namespace(&self.with_server_id("workers")), 5));
+        try!(Pipeline::new()
+            .hset(&self.with_namespace(&self.with_server_id("workers")),
+                  &self.id,
+                  payload.dump())
+            .expire(&self.with_namespace(&self.with_server_id("workers")), 5)
+            .query(&*conn));
+
         Ok(())
     }
 

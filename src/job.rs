@@ -99,7 +99,7 @@ impl Deserialize for Job {
                     obj.remove("enqueued_at");
                     obj
                 },
-                namespace: "".into(),
+                namespace: "".into(), // it will be set later on
             })
         } else {
             Err(D::Error::custom("not an object"))
@@ -158,11 +158,11 @@ impl Serialize for Job {
     }
 }
 
-pub struct Retry {
-    retry_count: usize,
-    error_message: String,
-    error_class: String,
-    error_backtrace: Vec<String>,
-    failed_at: f64,
-    retried_at: f64,
+pub struct RetryInfo {
+    pub etry_count: usize,
+    pub error_message: String,
+    pub error_class: String,
+    pub error_backtrace: Vec<String>,
+    pub failed_at: f64,
+    pub retried_at: f64,
 }
