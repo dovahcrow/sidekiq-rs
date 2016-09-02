@@ -1,6 +1,7 @@
 use serde_json::Value as JValue;
 use std::collections::BTreeMap;
 use serde::{Serialize, Deserialize, Serializer, Deserializer, Error};
+use chrono::{DateTime, UTC, NaiveDateTime};
 
 #[derive(Debug, Clone)]
 pub enum BoolOrUSize {
@@ -13,8 +14,8 @@ pub struct Job {
     pub class: String,
     pub jid: String,
     pub args: Vec<JValue>,
-    pub created_at: f64,
-    pub enqueued_at: f64,
+    pub created_at: DateTime<UTC>,
+    pub enqueued_at: DateTime<UTC>,
     pub queue: String,
     pub retry: BoolOrUSize,
 
@@ -74,10 +75,18 @@ impl Deserialize for Job {
                     .ok_or(D::Error::custom("no member 'retry'"))),
                 created_at: try!(obj.get("created_at")
                         .and_then(|v| v.as_f64())
+                        .map(|f| {
+                            NaiveDateTime::from_timestamp(f as i64, ((f - f.floor()) * 1e9) as u32)
+                        })
+                        .map(|t| DateTime::from_utc(t, UTC))
                         .ok_or(D::Error::custom("no member 'created_at'")))
                     .into(),
                 enqueued_at: try!(obj.get("enqueued_at")
                         .and_then(|v| v.as_f64())
+                        .map(|f| {
+                            NaiveDateTime::from_timestamp(f as i64, ((f - f.floor()) * 1e9) as u32)
+                        })
+                        .map(|t| DateTime::from_utc(t, UTC))
                         .ok_or(D::Error::custom("no member 'enqueued_at'")))
                     .into(),
                 extra: {
@@ -117,10 +126,16 @@ impl Serialize for Job {
         try!(serializer.serialize_map_value(&mut state, &self.jid));
 
         try!(serializer.serialize_map_key(&mut state, "created_at"));
-        try!(serializer.serialize_map_value(&mut state, &self.created_at));
+        try!(serializer.serialize_map_value(&mut state,
+                                            self.created_at.timestamp() as f64 +
+                                            self.created_at.timestamp_subsec_nanos() as f64 / 1e9));
 
         try!(serializer.serialize_map_key(&mut state, "enqueued_at"));
-        try!(serializer.serialize_map_value(&mut state, &self.enqueued_at));
+        try!(serializer.serialize_map_value(&mut state,
+                                            self.enqueued_at.timestamp() as f64 +
+                                            self.enqueued_at.timestamp_subsec_nanos() as f64 /
+                                            1e9));
+
 
         match self.retry {
             BoolOrUSize::Bool(x) => {
@@ -141,4 +156,13 @@ impl Serialize for Job {
         serializer.serialize_map_end(state)
 
     }
+}
+
+pub struct Retry {
+    retry_count: usize,
+    error_message: String,
+    error_class: String,
+    error_backtrace: Vec<String>,
+    failed_at: f64,
+    retried_at: f64,
 }
