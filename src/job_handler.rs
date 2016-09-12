@@ -10,40 +10,26 @@ pub trait JobHandler: Send {
     fn cloned(&mut self) -> Box<JobHandler>;
 }
 
-#[derive(Clone)]
-pub struct PrinterHandler;
-
-impl JobHandler for PrinterHandler {
+impl<F> JobHandler for F
+    where F: FnMut(&Job) -> JobHandlerResult + Copy + Send + 'static
+{
     fn handle(&mut self, job: &Job) -> JobHandlerResult {
-        info!("handling {:?}", job);
-        Ok(Success)
+        self(job)
     }
     fn cloned(&mut self) -> Box<JobHandler> {
-        Box::new(self.clone())
+        Box::new(*self)
     }
 }
 
-#[derive(Clone)]
-pub struct ErrorHandler;
-
-
-impl JobHandler for ErrorHandler {
-    fn handle(&mut self, _: &Job) -> JobHandlerResult {
-        Err(ErrorKind::JobHandlerError(Box::new("a".parse::<i8>().unwrap_err())).into())
-    }
-    fn cloned(&mut self) -> Box<JobHandler> {
-        Box::new(self.clone())
-    }
+pub fn printer_handler(job: &Job) -> JobHandlerResult {
+    info!("handling {:?}", job);
+    Ok(Success)
 }
 
-#[derive(Clone)]
-pub struct PanicHandler;
+pub fn error_handler(_: &Job) -> JobHandlerResult {
+    Err(ErrorKind::JobHandlerError(Box::new("a".parse::<i8>().unwrap_err())).into())
+}
 
-impl JobHandler for PanicHandler {
-    fn handle(&mut self, _: &Job) -> JobHandlerResult {
-        panic!("yeah, I do it deliberately")
-    }
-    fn cloned(&mut self) -> Box<JobHandler> {
-        Box::new(self.clone())
-    }
+pub fn panic_handler(_: &Job) -> JobHandlerResult {
+    panic!("yeah, I do it deliberately")
 }

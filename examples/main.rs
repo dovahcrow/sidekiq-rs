@@ -46,9 +46,9 @@ fn main() {
 
     let mut server = SidekiqServer::new(&args.flag_redis, args.flag_concurrency).unwrap();
 
-    server.attach_handler("Printer", PrinterHandler);
-    server.attach_handler("Error", ErrorHandler);
-    server.attach_handler("Panic", PanicHandler);
+    server.attach_handler("Printer", printer_handler);
+    server.attach_handler("Error", error_handler);
+    server.attach_handler("Panic", panic_handler);
 
     server.attach_middleware(retry_middleware);
     for (name, weight) in queues {

@@ -15,13 +15,13 @@ pub trait MiddleWare: Send {
 }
 
 impl<F> MiddleWare for F
-    where F: FnMut(&mut Job, RedisPool, NextFunc) -> MiddleWareResult + Clone + Send + 'static
+    where F: FnMut(&mut Job, RedisPool, NextFunc) -> MiddleWareResult + Copy + Send + 'static
 {
     fn handle(&mut self, job: &mut Job, redis: RedisPool, next: NextFunc) -> MiddleWareResult {
         self(job, redis, next)
     }
     fn cloned(&mut self) -> Box<MiddleWare> {
-        Box::new(self.clone())
+        Box::new(*self)
     }
 }
 
