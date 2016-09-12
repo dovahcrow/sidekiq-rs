@@ -39,8 +39,8 @@ pub struct SidekiqServer<'a> {
     redispool: RedisPool,
     threadpool: ThreadPool,
     pub namespace: String,
-    job_handlers: BTreeMap<String, &'a mut JobHandler>,
-    middlewares: Vec<&'a mut MiddleWare>,
+    job_handlers: BTreeMap<String, Box<JobHandler + 'a>>,
+    middlewares: Vec<Box<MiddleWare + 'a>>,
     queues: Vec<String>,
     weights: Vec<f64>,
     started_at: f64,
@@ -87,12 +87,12 @@ impl<'a> SidekiqServer<'a> {
         self.weights.push(weight as f64);
     }
 
-    pub fn attach_handler(&mut self, name: &str, handle: &'a mut JobHandler) {
-        self.job_handlers.insert(name.into(), handle);
+    pub fn attach_handler<T: JobHandler + 'a>(&mut self, name: &str, handle: T) {
+        self.job_handlers.insert(name.into(), Box::new(handle));
     }
 
-    pub fn attach_middleware(&mut self, factory: &'a mut MiddleWare) {
-        self.middlewares.push(factory);
+    pub fn attach_middleware<T: MiddleWare + 'a>(&mut self, factory: T) {
+        self.middlewares.push(Box::new(factory));
     }
 
     pub fn start(&mut self) {

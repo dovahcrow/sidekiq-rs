@@ -156,23 +156,28 @@ impl<'a> SidekiqWorker<'a> {
         }
     }
 
-    fn call_middleware<F>(&self, mut job: Job, mut handle: F) -> Result<JobSuccessType>
+    fn call_middleware<F>(&mut self, mut job: Job, mut job_handle: F) -> Result<JobSuccessType>
         where F: FnMut(&Job) -> JobHandlerResult
     {
-        fn imp<'a>(job: &mut Job,
-                   redis: RedisPool,
-                   chain: &[Box<MiddleWare + 'a>],
-                   mut handle: &mut FnMut(&Job) -> JobHandlerResult)
-                   -> Result<JobSuccessType> {
-            if chain.len() == 0 {
-                handle(&job)
-            } else {
-                chain[0].handle(job,
+        fn imp<'a, F: FnMut(&Job) -> JobHandlerResult>(job: &mut Job,
+                                                       redis: RedisPool,
+                                                       chain: &mut [Box<MiddleWare + 'a>],
+                                                       job_handle: &mut F)
+                                                       -> Result<JobSuccessType> {
+            chain.split_first_mut()
+                .map(|(head, tail)| {
+                    head.handle(job,
                                 redis,
-                                &mut |job, redis| imp(job, redis, &chain[1..], handle))
-            }
+                                &mut |job, redis| imp(job, redis, tail, job_handle))
+                })
+                .or_else(|| Some(job_handle(&job)))
+                .unwrap()
         }
-        imp(&mut job, self.pool.clone(), &self.middlewares, &mut handle)
+
+        imp(&mut job,
+            self.pool.clone(),
+            &mut self.middlewares,
+            &mut job_handle)
     }
 
     fn sync_state(&mut self) {

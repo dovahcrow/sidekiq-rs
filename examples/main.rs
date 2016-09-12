@@ -43,18 +43,14 @@ fn main() {
         })
         .collect();
 
-    let mut handler_printer = PrinterHandler;
-    let mut handler_error = ErrorHandler;
-    let mut handler_panic = PanicHandler;
-    let mut middleware_peak = PeekMiddleWare;
-    let mut middleware_retry = RetryMiddleWare;
+
     let mut server = SidekiqServer::new(&args.flag_redis, args.flag_concurrency).unwrap();
 
-    server.attach_handler("Printer", &mut handler_printer);
-    server.attach_handler("Error", &mut handler_error);
-    server.attach_handler("Panic", &mut handler_panic);
-    // server.attach_middleware(&mut middleware_peak);
-    server.attach_middleware(&mut middleware_retry);
+    server.attach_handler("Printer", PrinterHandler);
+    server.attach_handler("Error", ErrorHandler);
+    server.attach_handler("Panic", PanicHandler);
+
+    server.attach_middleware(retry_middleware);
     for (name, weight) in queues {
         server.new_queue(&name, weight);
     }
