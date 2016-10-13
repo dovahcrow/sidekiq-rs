@@ -14,7 +14,7 @@ pub struct Job {
     pub class: String,
     pub jid: String,
     pub args: Vec<JValue>,
-    pub created_at: DateTime<UTC>,
+    pub created_at: Option<DateTime<UTC>>,
     pub enqueued_at: DateTime<UTC>,
     pub queue: String,
     pub retry: BoolOrUSize,
@@ -73,13 +73,14 @@ impl Deserialize for Job {
                         }
                     })
                     .ok_or(D::Error::custom("no member 'retry'"))),
-                created_at: try!(obj.get("created_at")
-                        .and_then(|v| v.as_f64())
-                        .map(|f| {
-                            NaiveDateTime::from_timestamp(f as i64, ((f - f.floor()) * 1e9) as u32)
-                        })
-                        .map(|t| DateTime::from_utc(t, UTC))
-                        .ok_or(D::Error::custom("no member 'created_at'")))
+                created_at: obj.get("created_at")
+                    .and_then(|v| v.as_f64())
+                    .map(|f| {
+                        NaiveDateTime::from_timestamp(f as i64, ((f - f.floor()) * 1e9) as u32)
+                    })
+                    .map(|t| DateTime::from_utc(t, UTC))
+                    .ok_or(D::Error::custom("no member 'created_at'"))
+                    .ok()
                     .into(),
                 enqueued_at: try!(obj.get("enqueued_at")
                         .and_then(|v| v.as_f64())
@@ -126,9 +127,13 @@ impl Serialize for Job {
         try!(serializer.serialize_map_value(&mut state, &self.jid));
 
         try!(serializer.serialize_map_key(&mut state, "created_at"));
-        try!(serializer.serialize_map_value(&mut state,
-                                            self.created_at.timestamp() as f64 +
-                                            self.created_at.timestamp_subsec_nanos() as f64 / 1e9));
+        try!(self.created_at
+            .map(|created_at| {
+                serializer.serialize_map_value(&mut state,
+                                               created_at.timestamp() as f64 +
+                                               created_at.timestamp_subsec_nanos() as f64 / 1e9)
+            })
+            .unwrap_or(Ok(())));
 
         try!(serializer.serialize_map_key(&mut state, "enqueued_at"));
         try!(serializer.serialize_map_value(&mut state,
