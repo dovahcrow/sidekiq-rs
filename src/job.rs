@@ -112,7 +112,7 @@ impl Serialize for Job {
     fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
         where S: Serializer
     {
-        let mut state = try!(serializer.serialize_map(Some(7 + self.extra.len() - self.created_at.is_none() as usize)));
+        let mut state = try!(serializer.serialize_map(None));
 
         try!(serializer.serialize_map_key(&mut state, "class"));
         try!(serializer.serialize_map_value(&mut state, &self.class));
@@ -125,13 +125,13 @@ impl Serialize for Job {
 
         try!(serializer.serialize_map_key(&mut state, "jid"));
         try!(serializer.serialize_map_value(&mut state, &self.jid));
-
-        try!(serializer.serialize_map_key(&mut state, "created_at"));
         try!(self.created_at
             .map(|created_at| {
-                serializer.serialize_map_value(&mut state,
-                                               created_at.timestamp() as f64 +
-                                               created_at.timestamp_subsec_nanos() as f64 / 1e9)
+                serializer.serialize_map_key(&mut state, "created_at").and_then(|_| {
+                    serializer.serialize_map_value(&mut state,
+                                                   created_at.timestamp() as f64 +
+                                                   created_at.timestamp_subsec_nanos() as f64 / 1e9)
+                })
             })
             .unwrap_or(Ok(())));
 
