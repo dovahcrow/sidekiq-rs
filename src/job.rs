@@ -112,7 +112,7 @@ impl Serialize for Job {
     fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
         where S: Serializer
     {
-        let mut state = try!(serializer.serialize_map(Some(7 + self.extra.len())));
+        let mut state = try!(serializer.serialize_map(Some(7 + self.extra.len() - self.created_at.is_none() as usize)));
 
         try!(serializer.serialize_map_key(&mut state, "class"));
         try!(serializer.serialize_map_value(&mut state, &self.class));
