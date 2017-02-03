@@ -283,7 +283,7 @@ impl<'a> SidekiqServer<'a> {
             .hset_multiple(self.with_namespace(&self.identity()), &content)
             .expire(self.with_namespace(&self.identity()), 5)
             .sadd(self.with_namespace(&"processes"), self.identity())
-            .query(&*conn));
+            .query::<()>(&*conn));
 
         Ok(())
 
