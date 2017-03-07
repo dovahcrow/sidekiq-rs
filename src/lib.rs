@@ -28,6 +28,11 @@ extern crate libc;
 
 extern crate chrono;
 
+extern crate result;
+
+#[macro_use]
+extern crate hado;
+
 #[macro_use]
 extern crate chan;
 extern crate chan_signal;

@@ -28,7 +28,8 @@ serde_json = "0.9"
 threadpool = "1.0.0"
 futures = "0.1"
 futures-cpupool = "0.1"
-result = "*"
+result = "0.0.1"
+hado = "0.1"
 
 [dev-dependencies]
 structopt = "0.0.3"
