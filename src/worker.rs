@@ -110,7 +110,7 @@ impl<'a> SidekiqWorker<'a> {
         }
     }
 
-    #[cfg_attr(feature="flame_it", flame)]
+
     fn run_queue_once(&mut self, name: &str) -> Result<bool> {
         let queue_name = self.queue_name(name);
         debug!("{}: queue name '{}'", self.id, queue_name);
@@ -133,7 +133,7 @@ impl<'a> SidekiqWorker<'a> {
         }
     }
 
-    #[cfg_attr(feature="flame_it", flame)]
+
     fn perform(&mut self, job: Job) -> Result<JobSuccessType> {
         debug!("{}: job is {:?}", self.id, job);
 
@@ -192,7 +192,7 @@ impl<'a> SidekiqWorker<'a> {
 
     // Sidekiq dashboard reporting functions
 
-    #[cfg_attr(feature="flame_it", flame)]
+
     fn report_working(&self, job: &Job) -> Result<()> {
         let conn = try!(self.pool.get());
         let payload: JValue = json!({
@@ -209,7 +209,7 @@ impl<'a> SidekiqWorker<'a> {
         Ok(())
     }
 
-    #[cfg_attr(feature="flame_it", flame)]
+
     fn report_done(&self) -> Result<()> {
         let _: () = self.pool
             .get()?
@@ -218,7 +218,7 @@ impl<'a> SidekiqWorker<'a> {
         Ok(())
     }
 
-    #[cfg_attr(feature="flame_it", flame)]
+
     fn with_namespace(&self, snippet: &str) -> String {
         if self.namespace == "" {
             snippet.into()
@@ -227,12 +227,12 @@ impl<'a> SidekiqWorker<'a> {
         }
     }
 
-    #[cfg_attr(feature="flame_it", flame)]
+
     fn with_server_id(&self, snippet: &str) -> String {
         self.server_id.clone() + ":" + snippet
     }
 
-    #[cfg_attr(feature="flame_it", flame)]
+
     fn queue_name(&self, name: &str) -> String {
         self.with_namespace(&("queue:".to_string() + name))
     }

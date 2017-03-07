@@ -1,5 +1,5 @@
 use job::Job;
-use ::JobSuccessType;
+use JobSuccessType;
 use ::JobSuccessType::*;
 use errors::{ErrorKind, Result};
 

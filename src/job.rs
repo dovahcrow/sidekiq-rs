@@ -29,7 +29,6 @@ pub struct Job {
 }
 
 impl Job {
-    #[cfg_attr(feature="flame_it", flame)]
     fn with_namespace(&self, snippet: &str) -> String {
         if self.namespace == "" {
             snippet.into()
@@ -37,7 +36,7 @@ impl Job {
             self.namespace.clone() + ":" + snippet
         }
     }
-    #[cfg_attr(feature="flame_it", flame)]
+
     pub fn queue_name(&self) -> String {
         self.with_namespace(&("queue:".to_string() + &self.queue))
     }

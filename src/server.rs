@@ -160,14 +160,14 @@ impl<'a> SidekiqServer<'a> {
 
     // Worker start/terminate functions
 
-    #[cfg_attr(feature="flame_it", flame)]
+
     fn launch_workers(&mut self, tsx: Sender<Signal>, rox: Receiver<Operation>) {
         while self.worker_info.len() < self.concurrency {
             self.launch_worker(tsx.clone(), rox.clone());
         }
     }
 
-    #[cfg_attr(feature="flame_it", flame)]
+
     fn launch_worker(&mut self, tsx: Sender<Signal>, rox: Receiver<Operation>) {
         let worker = SidekiqWorker::new(&self.identity(),
                                         self.redispool.clone(),
@@ -215,7 +215,7 @@ impl<'a> SidekiqServer<'a> {
         }
     }
 
-    #[cfg_attr(feature="flame_it", flame)]
+
     fn terminate_gracefully(&mut self, tox: Sender<Operation>, rsx: Receiver<Signal>) {
         self.inform_termination(tox);
 
@@ -236,7 +236,7 @@ impl<'a> SidekiqServer<'a> {
         }
     }
 
-    #[cfg_attr(feature="flame_it", flame)]
+
     fn deal_signal(&mut self, sig: Signal) -> Result<()> {
         debug!("dealing signal {:?}", sig);
         match sig {
@@ -261,7 +261,7 @@ impl<'a> SidekiqServer<'a> {
 
     // Sidekiq dashboard reporting functions
 
-    #[cfg_attr(feature="flame_it", flame)]
+
     fn report_alive(&mut self) -> Result<()> {
         let now = UTC::now();
 
@@ -292,7 +292,7 @@ impl<'a> SidekiqServer<'a> {
 
     }
 
-    #[cfg_attr(feature="flame_it", flame)]
+
     fn report_processed(&mut self, n: usize) -> Result<()> {
         let connection = try!(self.redispool.get());
         let _: () = Pipeline::new().incr(self.with_namespace(&format!("stat:processed:{}",
@@ -304,7 +304,7 @@ impl<'a> SidekiqServer<'a> {
         Ok(())
     }
 
-    #[cfg_attr(feature="flame_it", flame)]
+
     fn report_failed(&mut self, n: usize) -> Result<()> {
         let connection = try!(self.redispool.get());
         let _: () = Pipeline::new()
@@ -315,7 +315,7 @@ impl<'a> SidekiqServer<'a> {
         Ok(())
     }
 
-    #[cfg_attr(feature="flame_it", flame)]
+
     fn identity(&self) -> String {
         let host = rust_gethostname().unwrap_or("unknown".into());
         let pid = self.pid;
@@ -323,7 +323,7 @@ impl<'a> SidekiqServer<'a> {
         host + ":" + &pid.to_string() + ":" + &self.rs
     }
 
-    #[cfg_attr(feature="flame_it", flame)]
+
     fn with_namespace(&self, snippet: &str) -> String {
         if self.namespace == "" {
             snippet.into()
