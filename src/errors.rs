@@ -1,12 +1,10 @@
 use std::error::Error as StdError;
 error_chain!{
-    types {}
-    links {}
     foreign_links {
-         ::redis::RedisError, RedisError;
-         ::serde_json::Error, JsonError;
-         ::r2d2::GetTimeout, R2D2TimeoutError;
-         ::r2d2::InitializationError, R2D2InitializerError;
+         RedisError(::redis::RedisError) ;
+         JsonError(::serde_json::Error);
+         R2D2TimeoutError(::r2d2::GetTimeout);
+         R2D2InitializerError(::r2d2::InitializationError);
     }
     errors {
          WorkerError(t: String) {

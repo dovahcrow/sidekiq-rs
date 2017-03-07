@@ -1,8 +1,8 @@
 use serde_json::to_string;
 use chrono::UTC;
 
-use ::RedisPool;
-use ::JobSuccessType;
+use RedisPool;
+use JobSuccessType;
 use errors::Result;
 use job::Job;
 
@@ -43,13 +43,13 @@ pub fn retry_middleware(job: &mut Job, redis: RedisPool, mut next: NextFunc) -> 
                 Bool(true) => {
                     warn!("Job '{:?}' failed with '{}', retrying", job, e);
                     job.retry = Bool(false);
-                    try!(conn.lpush(job.queue_name(), to_string(job).unwrap()));
+                    let _: () = conn.lpush(job.queue_name(), to_string(job).unwrap())?;
                     Ok(JobSuccessType::Ignore)
                 }
                 USize(u) if u > 0 => {
                     warn!("'{:?}' failed with '{}', retrying", job, e);
                     job.retry = USize(u - 1);
-                    try!(conn.lpush(job.queue_name(), to_string(job).unwrap()));
+                    let _: () = conn.lpush(job.queue_name(), to_string(job).unwrap())?;
                     Ok(JobSuccessType::Ignore)
                 }
                 _ => Err(e),
@@ -67,6 +67,6 @@ pub fn time_elapse_middleware(job: &mut Job,
     let now = UTC::now();
     let r = next(job, redis);
     let that = UTC::now();
-    info!("'{:?}' takes {}", j, that - now);
+    info!("'{:?}' takes {}", j, that.signed_duration_since(now));
     r
 }

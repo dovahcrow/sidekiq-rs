@@ -16,12 +16,14 @@ use libc::getpid;
 
 use chrono::UTC;
 
+use serde_json::to_string;
+
 use worker::SidekiqWorker;
 use errors::*;
 use utils::rust_gethostname;
 use middleware::MiddleWare;
 use job_handler::JobHandler;
-use ::RedisPool;
+use RedisPool;
 
 #[derive(Debug)]
 pub enum Signal {
@@ -262,22 +264,23 @@ impl<'a> SidekiqServer<'a> {
     #[cfg_attr(feature="flame_it", flame)]
     fn report_alive(&mut self) -> Result<()> {
         let now = UTC::now();
+
         let content = vec![("info",
-                            object! {
-                                "hostname"=> rust_gethostname().unwrap_or("unknown".into()),
-                                "started_at"=> self.started_at,
-                                "pid"=> self.pid,
-                                "concurrency"=> self.concurrency,
-                                "queues"=> self.queues.clone(),
-                                "labels"=> array![],
-                                "identity"=> self.identity()
-                            }
-                               .dump()),
+                            to_string(&json!({
+                                "hostname": rust_gethostname().unwrap_or("unknown".into()),
+                                "started_at": self.started_at,
+                                "pid": self.pid,
+                                "concurrency": self.concurrency,
+                                "queues": self.queues.clone(),
+                                "labels": [],
+                                "identity": self.identity()
+                            }))
+                                .unwrap()),
                            ("busy", self.worker_info.values().filter(|v| **v).count().to_string()),
                            ("beat",
                             (now.timestamp() as f64 +
                              now.timestamp_subsec_micros() as f64 / 1000000f64)
-                               .to_string())];
+                                .to_string())];
         let conn = try!(self.redispool.get());
         try!(Pipeline::new()
             .hset_multiple(self.with_namespace(&self.identity()), &content)
@@ -292,12 +295,11 @@ impl<'a> SidekiqServer<'a> {
     #[cfg_attr(feature="flame_it", flame)]
     fn report_processed(&mut self, n: usize) -> Result<()> {
         let connection = try!(self.redispool.get());
-        try!(Pipeline::new()
-            .incr(self.with_namespace(&format!("stat:processed:{}",
+        let _: () = Pipeline::new().incr(self.with_namespace(&format!("stat:processed:{}",
                                                UTC::now().format("%Y-%m-%d"))),
                   n)
             .incr(self.with_namespace(&format!("stat:processed")), n)
-            .query(&*connection));
+            .query(&*connection)?;
 
         Ok(())
     }
@@ -305,11 +307,11 @@ impl<'a> SidekiqServer<'a> {
     #[cfg_attr(feature="flame_it", flame)]
     fn report_failed(&mut self, n: usize) -> Result<()> {
         let connection = try!(self.redispool.get());
-        try!(Pipeline::new()
+        let _: () = Pipeline::new()
             .incr(self.with_namespace(&format!("stat:failed:{}", UTC::now().format("%Y-%m-%d"))),
                   n)
             .incr(self.with_namespace(&format!("stat:failed")), n)
-            .query(&*connection));
+            .query(&*connection)?;
         Ok(())
     }
 

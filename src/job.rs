@@ -1,6 +1,11 @@
-use serde_json::Value as JValue;
 use std::collections::BTreeMap;
-use serde::{Serialize, Deserialize, Serializer, Deserializer, Error};
+use std::iter::FromIterator;
+
+use serde_json::Value as JValue;
+use serde::{Serialize, Deserialize, Serializer, Deserializer};
+use serde::de::Error;
+use serde::ser::SerializeMap;
+
 use chrono::{DateTime, UTC, NaiveDateTime};
 
 #[derive(Debug, Clone)]
@@ -39,10 +44,10 @@ impl Job {
 }
 
 impl Deserialize for Job {
-    fn deserialize<D>(deserializer: &mut D) -> Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
         where D: Deserializer
     {
-        let j = try!(JValue::deserialize(deserializer));
+        let j = <JValue as Deserialize>::deserialize(deserializer)?;
         if let Some(obj) = j.as_object() {
             let mut obj = obj.clone();
             Ok(Job {
@@ -98,7 +103,7 @@ impl Deserialize for Job {
                     obj.remove("retry");
                     obj.remove("created_at");
                     obj.remove("enqueued_at");
-                    obj
+                    BTreeMap::from_iter(obj)
                 },
                 namespace: "".into(), // it will be set later on
             })
@@ -109,56 +114,42 @@ impl Deserialize for Job {
 }
 
 impl Serialize for Job {
-    fn serialize<S>(&self, serializer: &mut S) -> Result<(), S::Error>
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
         where S: Serializer
     {
-        let mut state = try!(serializer.serialize_map(None));
+        let mut map_serializer = serializer.serialize_map(None)?;
 
-        try!(serializer.serialize_map_key(&mut state, "class"));
-        try!(serializer.serialize_map_value(&mut state, &self.class));
+        map_serializer.serialize_entry("class", &self.class)?;
+        map_serializer.serialize_entry("args", &self.args)?;
+        map_serializer.serialize_entry("queue", &self.queue)?;
+        map_serializer.serialize_entry("jid", &self.jid)?;
 
-        try!(serializer.serialize_map_key(&mut state, "args"));
-        try!(serializer.serialize_map_value(&mut state, &self.args));
-
-        try!(serializer.serialize_map_key(&mut state, "queue"));
-        try!(serializer.serialize_map_value(&mut state, &self.queue));
-
-        try!(serializer.serialize_map_key(&mut state, "jid"));
-        try!(serializer.serialize_map_value(&mut state, &self.jid));
-        try!(self.created_at
+        self.created_at
             .map(|created_at| {
-                serializer.serialize_map_key(&mut state, "created_at").and_then(|_| {
-                    serializer.serialize_map_value(&mut state,
-                                                   created_at.timestamp() as f64 +
-                                                   created_at.timestamp_subsec_nanos() as f64 / 1e9)
-                })
+                let timestamp = created_at.timestamp() as f64 +
+                                created_at.timestamp_subsec_nanos() as f64 / 1e9;
+                map_serializer.serialize_entry("created_at", &timestamp)
             })
-            .unwrap_or(Ok(())));
+            .unwrap_or(Ok(()))?;
 
-        try!(serializer.serialize_map_key(&mut state, "enqueued_at"));
-        try!(serializer.serialize_map_value(&mut state,
-                                            self.enqueued_at.timestamp() as f64 +
-                                            self.enqueued_at.timestamp_subsec_nanos() as f64 /
-                                            1e9));
-
+        let enqueued_at = self.enqueued_at.timestamp() as f64 +
+                          self.enqueued_at.timestamp_subsec_nanos() as f64 / 1e9;
+        map_serializer.serialize_entry("enqueued_at", &enqueued_at)?;
 
         match self.retry {
             BoolOrUSize::Bool(x) => {
-                try!(serializer.serialize_map_key(&mut state, "retry"));
-                try!(serializer.serialize_map_value(&mut state, x));
+                map_serializer.serialize_entry("retry", &x)?;
             }
             BoolOrUSize::USize(x) => {
-                try!(serializer.serialize_map_key(&mut state, "retry"));
-                try!(serializer.serialize_map_value(&mut state, x));
+                map_serializer.serialize_entry("retry", &x)?;
             }
         };
 
         for (k, v) in &self.extra {
-            try!(serializer.serialize_map_key(&mut state, k));
-            try!(serializer.serialize_map_value(&mut state, v));
+            map_serializer.serialize_entry(k, v)?;
         }
 
-        serializer.serialize_map_end(state)
+        map_serializer.end()
 
     }
 }

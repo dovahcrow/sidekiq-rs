@@ -5,10 +5,8 @@
 extern crate flame;
 
 extern crate serde;
-extern crate serde_json;
-
 #[macro_use]
-extern crate json;
+extern crate serde_json;
 
 #[macro_use]
 extern crate log;

@@ -14,16 +14,15 @@ use redis::{Commands, PipelineCommands, Pipeline};
 
 
 use rand::Rng;
-use json::parse;
-use serde_json::to_string;
+use serde_json::{to_string, Value as JValue};
 use chrono::UTC;
 
 use server::{Signal, Operation};
 use job::Job;
 use job_handler::{JobHandler, JobHandlerResult};
 use middleware::MiddleWare;
-use ::RedisPool;
-use ::JobSuccessType;
+use RedisPool;
+use JobSuccessType;
 
 
 pub struct SidekiqWorker<'a> {
@@ -145,9 +144,7 @@ impl<'a> SidekiqWorker<'a> {
             return Err("unknown job class".into());
         };
 
-        match catch_unwind(AssertUnwindSafe(|| {
-            self.call_middleware(job, |job| handler.handle(job))
-        })) {
+        match catch_unwind(AssertUnwindSafe(|| { self.call_middleware(job, |job| handler.handle(job)) })) {
             Err(_) => {
                 error!("Worker '{}' panicked, recovering", self.id);
                 Err("Worker crashed".into())
@@ -198,26 +195,26 @@ impl<'a> SidekiqWorker<'a> {
     #[cfg_attr(feature="flame_it", flame)]
     fn report_working(&self, job: &Job) -> Result<()> {
         let conn = try!(self.pool.get());
-        let payload = object! {
-            "queue" => job.queue.clone(),
-            "payload" => parse(&to_string(job).unwrap()).unwrap(),
-            "run_at" => UTC::now().timestamp()
-        };
-        try!(Pipeline::new()
-            .hset(&self.with_namespace(&self.with_server_id("workers")),
+        let payload: JValue = json!({
+            "queue": job.queue.clone(),
+            "payload": job,
+            "run_at": UTC::now().timestamp()
+        });
+        let _: () = Pipeline::new().hset(&self.with_namespace(&self.with_server_id("workers")),
                   &self.id,
-                  payload.dump())
+                  to_string(&payload).unwrap())
             .expire(&self.with_namespace(&self.with_server_id("workers")), 5)
-            .query(&*conn));
+            .query(&*conn)?;
 
         Ok(())
     }
 
     #[cfg_attr(feature="flame_it", flame)]
     fn report_done(&self) -> Result<()> {
-        let _ = try!(try!(self.pool.get())
+        let _: () = self.pool
+            .get()?
             .hdel(&self.with_namespace(&self.with_server_id("workers")),
-                  &self.id));
+                  &self.id)?;
         Ok(())
     }
 
