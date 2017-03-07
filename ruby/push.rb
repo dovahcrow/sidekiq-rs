@@ -1,9 +1,8 @@
 require 'sidekiq'
-require 'redis-namespace'
 
-Sidekiq.configure_client do |config|
-  config.redis = { namespace: 'annie' }
-end
+# Sidekiq.configure_client do |config|
+#   config.redis = { namespace: 'annie' }
+# end
 
 require_relative 'lib/worker/panic'
 require_relative 'lib/worker/printer'
@@ -15,10 +14,10 @@ require_relative 'lib/worker/error'
 #   Panic.perform_async('Big')
 # end
 
-10.times do
-  Error.perform_async('Stranger')
-end
-
-# 10_0000.times do
-#   Printer.perform_async("damn")
+# 10.times do
+#   Error.perform_async('Stranger')
 # end
+
+10.times do
+  Printer.perform_async("Damn")
+end
