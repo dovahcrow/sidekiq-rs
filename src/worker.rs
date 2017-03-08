@@ -115,15 +115,19 @@ impl<'a> SidekiqWorker<'a> {
         let queue_name = self.queue_name(name);
         debug!("{}: queue name '{}'", self.id, queue_name);
 
-        let result: Option<Vec<String>> = try!(try!(self.pool.get()).brpop(&queue_name, 2));
+        let result: Option<Vec<String>> = self.pool.get()?.brpop(&queue_name, 2)?;
 
         if let Some(result) = result {
-            let mut job: Job = try!(from_str(&result[1]));
+            let mut job: Job = from_str(&result[1])?;
             self.tx.send(Signal::Acquire(self.id.clone()));
+            if let Some(ref mut retry_info) = job.retry_info {
+                retry_info.retried_at = Some(UTC::now());
+            }
+
             job.namespace = self.namespace.clone();
-            try!(self.report_working(&job));
-            let r = try!(self.perform(job));
-            try!(self.report_done());
+            self.report_working(&job)?;
+            let r = self.perform(job)?;
+            self.report_done()?;
             match r {
                 JobSuccessType::Ignore => Ok(false),
                 JobSuccessType::Success => Ok(true),
