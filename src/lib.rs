@@ -20,8 +20,6 @@ extern crate hado;
 #[macro_use]
 extern crate chan;
 extern crate chan_signal;
-#[macro_use]
-extern crate derive_builder;
 extern crate futures;
 extern crate futures_cpupool;
 #[macro_use]
@@ -43,8 +41,8 @@ use futures::BoxFuture;
 
 
 pub use server::SidekiqServer;
-pub use job_handler::JobHandler;
-pub use middleware::MiddleWare;
+pub use job_handler::{JobHandler, PrinterHandler, ErrorHandler, PanicHandler};
+pub use middleware::{MiddleWare, PeekMiddleware, TimeElapseMiddleware, RetryMiddleware};
 pub use job::{Job, RetryInfo};
 
 pub type RedisPool = Pool<RedisConnectionManager>;

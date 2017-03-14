@@ -1,8 +1,8 @@
-use futures::{BoxFuture, Future};
+use futures::Future;
 use futures::future::{ok, err};
 
 use job_agent::JobAgent;
-use errors::{ErrorKind, Result, Error};
+use errors::ErrorKind;
 use FutureJob;
 
 pub trait JobHandler: Send {
@@ -10,16 +10,19 @@ pub trait JobHandler: Send {
     fn cloned(&mut self) -> Box<JobHandler>;
 }
 
-pub fn printer_handler(continuation: JobAgent) -> JobAgent {
+#[allow(non_snake_case)]
+pub fn PrinterHandler(continuation: JobAgent) -> JobAgent {
     info!("handling {:?}", *continuation);
     continuation
 }
 
-pub fn error_handler(job: JobAgent) -> FutureJob {
+#[allow(non_snake_case)]
+pub fn ErrorHandler(job: JobAgent) -> FutureJob {
     err((job, ErrorKind::ZeroConcurrency.into())).boxed()
 }
 
-pub fn panic_handler() {
+#[allow(non_snake_case)]
+pub fn PanicHandler() {
     panic!("yeah, I do it deliberately")
 }
 

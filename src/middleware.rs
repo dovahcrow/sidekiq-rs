@@ -1,17 +1,12 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
-use std::cell::RefCell;
 
-use serde_json::to_string;
 use chrono::{UTC, DateTime};
-use futures::{BoxFuture, Future, IntoFuture};
+use futures::{Future, IntoFuture};
 use futures::future::{ok, err};
 
-
-use RedisPool;
-use errors::{Result, Error};
 use job_agent::JobAgent;
-use job::{Job, RetryInfo};
+use job::RetryInfo;
 use FutureJob;
 
 pub trait MiddleWare: Send {
@@ -34,6 +29,8 @@ mod peek_middleware {
         println!("After Call {:?}", *job);
         job
     }
+
+    #[allow(non_upper_case_globals)]
     pub static PeekMiddleware: (fn(JobAgent) -> JobAgent, fn(JobAgent) -> JobAgent) = (peek_before,
                                                                                        peek_after);
 }
@@ -44,7 +41,7 @@ pub use self::peek_middleware::PeekMiddleware;
 pub struct RetryMiddleware;
 impl MiddleWare for RetryMiddleware {
     fn after(&mut self, continuation: FutureJob) -> FutureJob {
-        use job::BoolOrUSize::{self, Bool, USize};
+        use job::BoolOrUSize::{Bool, USize};
 
         continuation.or_else(|(mut job, e)| {
                 let retry_count = job.retry_info.as_ref().map(|i| i.retry_count).unwrap_or(0);

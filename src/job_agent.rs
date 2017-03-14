@@ -1,7 +1,5 @@
 use std::ops::{Deref, DerefMut};
 use std::convert::Into;
-use std::collections::HashMap;
-use std::any::Any;
 use job::Job;
 use errors::Result;
 
