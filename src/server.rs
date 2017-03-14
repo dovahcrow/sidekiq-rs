@@ -110,22 +110,33 @@ impl<'a> SidekiqServer<'a> {
             bail!(ZeroQueue)
         }
 
-        let server_id: String = ::rand::thread_rng().gen_ascii_chars().take(12).collect();
+        let rs: String = ::rand::thread_rng().gen_ascii_chars().take(12).collect(); // random string
         let signal = notify(&[SysSignal::INT, SysSignal::USR1]); // should be here to set proper signal mask to all threads
         let now = UTC::now();
+        let pid = unsafe { getpid() } as usize;
+        let server_id = server_id(pid, &rs, "");
+        let server_id_cloned = server_id.clone();
 
+        // redis pool config
         let config = Config::builder()
             .pool_size(builder.concurrency as u32) // dunno why, it corrupt for unable to get connection sometimes with concurrency + 1
             .build();
+
+        // redis pool
         let redis_pool = Pool::new(config, RedisConnectionManager::new(redis)?)?;
-        let server_id_clone = server_id.clone();
+
+        // worker pool
         let worker_pool = futures_cpupool::Builder::new()
             .after_start(move || {
                 WORKER_ID.with(|id| {
-                    info!("worker '{}:{}' start working", server_id_clone, id);
+                    info!("Worker '{}:{}' start working", server_id, id);
                 })
             })
-            .before_stop(|| info!("Worker stoped"))
+            .before_stop(move || {
+                WORKER_ID.with(|id| {
+                    info!("Worker '{}:{}' stopped", server_id_cloned, id);
+                })
+            })
             .name_prefix("sidekiq-rs")
             .pool_size(builder.concurrency)
             .create();
@@ -138,14 +149,14 @@ impl<'a> SidekiqServer<'a> {
             queues: builder.queues.clone(),
             weights: builder.weights.clone(),
             started_at: now.timestamp() as f64 + now.timestamp_subsec_micros() as f64 / 1000000f64,
-            pid: unsafe { getpid() } as usize,
+            pid: pid,
             worker_info: BTreeMap::new(),
             concurrency: builder.concurrency,
             signal_chan: signal,
             force_quite_timeout: 10,
             middlewares: vec![],
             // random itentity
-            rs: server_id,
+            rs: rs,
         })
     }
 
@@ -350,10 +361,7 @@ impl<'a> SidekiqServer<'a> {
     }
 
     fn identity(&self) -> String {
-        let host = rust_gethostname().unwrap_or("unknown".into());
-        let pid = self.pid;
-
-        host + ":" + &pid.to_string() + ":" + &self.rs
+        identity(self.pid, &self.rs)
     }
 
 
@@ -366,7 +374,7 @@ impl<'a> SidekiqServer<'a> {
     }
 
     fn with_server_id(&self, snippet: &str) -> String {
-        self.rs.clone() + ":" + snippet
+        server_id(self.pid, &self.rs, snippet)
     }
 
     fn queue_name(&self, name: &str) -> String {
@@ -378,4 +386,15 @@ impl<'a> Drop for SidekiqServer<'a> {
     fn drop(&mut self) {
         info!("sidekiq-rs exited");
     }
+}
+
+fn identity(pid: usize, rs: &str) -> String {
+    let host = rust_gethostname().unwrap_or("unknown".into());
+    let pid = pid;
+
+    host + ":" + &pid.to_string() + ":" + rs
+}
+
+fn server_id(pid: usize, rs: &str, snippet: &str) -> String {
+    identity(pid, rs) + ":" + snippet
 }
