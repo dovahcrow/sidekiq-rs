@@ -1,3 +1,5 @@
+#![feature(trace_macros,log_syntax)]
+#![recursion_limit="1024"]
 extern crate serde;
 #[macro_use]
 extern crate serde_json;
@@ -6,7 +8,6 @@ extern crate log;
 extern crate env_logger;
 #[macro_use]
 extern crate error_chain;
-extern crate threadpool;
 extern crate redis;
 extern crate r2d2;
 extern crate r2d2_redis;
@@ -19,28 +20,32 @@ extern crate hado;
 #[macro_use]
 extern crate chan;
 extern crate chan_signal;
+#[macro_use]
+extern crate derive_builder;
+extern crate futures;
+extern crate futures_cpupool;
+#[macro_use]
+extern crate derive_more;
 
 mod server;
 mod job_handler;
 pub mod errors;
 mod job;
 mod utils;
-mod worker;
+//mod worker;
 mod middleware;
+mod job_agent;
+//mod reporter;
 
 use r2d2::Pool;
 use r2d2_redis::RedisConnectionManager;
+use futures::BoxFuture;
 
 
 pub use server::SidekiqServer;
-pub use job_handler::{JobHandler, JobHandlerResult, printer_handler, error_handler, panic_handler};
-pub use middleware::{MiddleWare, MiddleWareResult, peek_middleware, retry_middleware,
-                     time_elapse_middleware, NextFunc};
+pub use job_handler::JobHandler;
+pub use middleware::MiddleWare;
 pub use job::{Job, RetryInfo};
-pub type RedisPool = Pool<RedisConnectionManager>;
 
-#[derive(Debug, Clone)]
-pub enum JobSuccessType {
-    Success,
-    Ignore,
-}
+pub type RedisPool = Pool<RedisConnectionManager>;
+pub type FutureJob = BoxFuture<job_agent::JobAgent, (job_agent::JobAgent, errors::Error)>;
