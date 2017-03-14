@@ -1,10 +1,12 @@
+#![feature(attr_literals)]
 extern crate structopt;
 #[macro_use]
 extern crate structopt_derive;
 extern crate sidekiq;
 extern crate env_logger;
 
-use sidekiq::{error_handler, panic_handler, printer_handler, retry_middleware, SidekiqServer};
+use sidekiq::{ErrorHandler, PanicHandler, PrinterHandler, RetryMiddleware, TimeElapseMiddleware,
+              SidekiqServerBuilder, FutureJob, JobAgent};
 use structopt::StructOpt;
 
 #[derive(StructOpt, Debug, Clone)]
@@ -16,7 +18,7 @@ struct Params {
     namespace: String,
     #[structopt(short = "c", long = "concurrency", help = "how many workers do you want to start", default_value = "10")]
     concurrency: usize,
-    #[structopt(short = "q", long = "queues", help = "the queues, in `name:weight` format, e.g. `critical:10`")]
+    #[structopt(short = "q", long = "queues", required = true, multiple = true, help = "the queues, in `name:weight` format, e.g. `critical:10`")]
     queues: Vec<String>,
     #[structopt(short = "t", long = "timeout", help = "the timeout when force terminated", default_value = "10")]
     timeout: usize,
@@ -36,23 +38,16 @@ fn main() {
         })
         .collect();
 
-
-    let mut server = SidekiqServer::new(&params.redis, params.concurrency).unwrap();
-
-    server.attach_handler("Printer", printer_handler);
-    server.attach_handler("Error", error_handler);
-    server.attach_handler("Panic", panic_handler);
-
-    server.attach_middleware(retry_middleware);
+    let mut builder = SidekiqServerBuilder::new();
+    builder.concurrency(params.concurrency)
+        .job_handler("Printer", PrinterHandler as fn(JobAgent) -> JobAgent)
+        .job_handler("Error", ErrorHandler as fn(JobAgent) -> FutureJob)
+        .job_handler("Panic", PanicHandler as fn())
+        .middleware(RetryMiddleware)
+        .middleware(TimeElapseMiddleware::new());
     for (name, weight) in queues {
-        server.new_queue(&name, weight);
+        builder.queue(&name, weight);
     }
-
-    server.namespace = params.namespace;
-    server.force_quite_timeout = params.timeout;
-    start(server)
-}
-
-fn start(mut server: SidekiqServer) {
-    server.start();
+    let server = builder.build(&params.redis).expect("cannot create sidekiq server");
+    server.start()
 }

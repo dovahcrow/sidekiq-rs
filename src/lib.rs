@@ -30,20 +30,19 @@ mod job_handler;
 pub mod errors;
 mod job;
 mod utils;
-//mod worker;
 mod middleware;
 mod job_agent;
-//mod reporter;
 
 use r2d2::Pool;
 use r2d2_redis::RedisConnectionManager;
 use futures::BoxFuture;
 
 
-pub use server::SidekiqServer;
+pub use server::{SidekiqServerBuilder, SidekiqServer};
 pub use job_handler::{JobHandler, PrinterHandler, ErrorHandler, PanicHandler};
 pub use middleware::{MiddleWare, PeekMiddleware, TimeElapseMiddleware, RetryMiddleware};
 pub use job::{Job, RetryInfo};
+pub use job_agent::JobAgent;
 
 pub type RedisPool = Pool<RedisConnectionManager>;
 pub type FutureJob = BoxFuture<job_agent::JobAgent, (job_agent::JobAgent, errors::Error)>;

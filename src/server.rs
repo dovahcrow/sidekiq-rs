@@ -9,7 +9,7 @@ use rand::Rng;
 
 use futures_cpupool;
 
-use chan::{tick, Receiver};
+use chan::{tick, WaitGroup, Receiver};
 use chan_signal::{Signal as SysSignal, notify};
 
 use libc::getpid;
@@ -34,18 +34,16 @@ use job::Job;
 use job_agent::JobAgent;
 use FutureJob;
 
-
-
 thread_local! {
     pub static WORKER_ID: String = ::rand::thread_rng().gen_ascii_chars().take(9).collect(); 
 }
-
 
 #[derive(Default)]
 pub struct SidekiqServerBuilder<'a> {
     concurrency: usize,
     middlewares: Vec<Box<MiddleWare + 'a>>,
     job_handlers: BTreeMap<String, Box<JobHandler + 'a>>,
+    namespace: String,
     queues: Vec<String>,
     weights: Vec<f64>,
 }
@@ -70,12 +68,16 @@ impl<'a> SidekiqServerBuilder<'a> {
         self.job_handlers.insert(name.to_string(), Box::new(handler));
         self
     }
+    pub fn namespace(&mut self, namespace: &str) -> &mut Self {
+        self.namespace = namespace.into();
+        self
+    }
     pub fn queue(&mut self, name: &str, weight: f64) -> &mut Self {
         self.queues.push(name.to_string());
         self.weights.push(weight);
         self
     }
-    pub fn build(&self, redis: &str) -> Result<SidekiqServer> {
+    pub fn build(self, redis: &str) -> Result<SidekiqServer<'a>> {
         SidekiqServer::with_builder(self, redis)
     }
 }
@@ -83,7 +85,7 @@ impl<'a> SidekiqServerBuilder<'a> {
 pub struct SidekiqServer<'a> {
     redis_pool: RedisPool,
     worker_pool: futures_cpupool::CpuPool,
-    pub namespace: String,
+    namespace: String,
     job_handlers: BTreeMap<String, Box<JobHandler + 'a>>,
     middlewares: Vec<Box<MiddleWare + 'a>>,
     queues: Vec<String>,
@@ -92,34 +94,39 @@ pub struct SidekiqServer<'a> {
     rs: String,
     pid: usize,
     signal_chan: Receiver<SysSignal>,
-    worker_info: BTreeMap<String, bool>, // busy?
+    worker_info: BTreeMap<String, bool>,
     concurrency: usize,
-    pub force_quite_timeout: usize,
+    wg: WaitGroup,
 }
 
 impl<'a> SidekiqServer<'a> {
     // Interfaces to be exposed
-    pub fn with_builder(builder: &SidekiqServerBuilder, redis: &str) -> Result<Self> {
-        if builder.concurrency == 0 {
+    pub fn with_builder(SidekiqServerBuilder {
+            concurrency, middlewares, job_handlers, namespace, queues, weights
+        }: SidekiqServerBuilder<'a>, redis: &str) -> Result<Self> {
+        if concurrency == 0 {
             bail!(ZeroConcurrency)
         }
-        if builder.job_handlers.len() == 0 {
+        if job_handlers.len() == 0 {
             bail!(NoJobHandler)
         }
-        if builder.queues.len() == 0 {
+        if queues.len() == 0 {
             bail!(ZeroQueue)
         }
 
         let rs: String = ::rand::thread_rng().gen_ascii_chars().take(12).collect(); // random string
+        let rs_cloned = rs.clone(); // for capture
+        let rs_cloned2 = rs.clone(); // for capture
         let signal = notify(&[SysSignal::INT, SysSignal::USR1]); // should be here to set proper signal mask to all threads
         let now = UTC::now();
         let pid = unsafe { getpid() } as usize;
-        let server_id = server_id(pid, &rs, "");
-        let server_id_cloned = server_id.clone();
+        let wg = WaitGroup::new();
+        wg.add(concurrency as i32);
+        let wg_worker = wg.clone();
 
         // redis pool config
         let config = Config::builder()
-            .pool_size(builder.concurrency as u32) // dunno why, it corrupt for unable to get connection sometimes with concurrency + 1
+            .pool_size(concurrency as u32) // dunno why, it corrupt for unable to get connection sometimes with concurrency + 1
             .build();
 
         // redis pool
@@ -129,38 +136,39 @@ impl<'a> SidekiqServer<'a> {
         let worker_pool = futures_cpupool::Builder::new()
             .after_start(move || {
                 WORKER_ID.with(|id| {
-                    info!("Worker '{}:{}' start working", server_id, id);
+                    info!("Worker '{}' start working", server_id(pid, &rs_cloned, &id));
                 })
             })
             .before_stop(move || {
                 WORKER_ID.with(|id| {
-                    info!("Worker '{}:{}' stopped", server_id_cloned, id);
+                    wg_worker.done();
+                    info!("Worker '{}' stopped", server_id(pid, &rs_cloned2, &id));
                 })
             })
             .name_prefix("sidekiq-rs")
-            .pool_size(builder.concurrency)
+            .pool_size(concurrency)
             .create();
 
         Ok(SidekiqServer {
             redis_pool: redis_pool,
             worker_pool: worker_pool,
-            namespace: String::new(),
-            job_handlers: BTreeMap::new(),
-            queues: builder.queues.clone(),
-            weights: builder.weights.clone(),
+            namespace: namespace,
+            job_handlers: job_handlers,
+            queues: queues,
+            weights: weights.clone(),
             started_at: now.timestamp() as f64 + now.timestamp_subsec_micros() as f64 / 1000000f64,
             pid: pid,
             worker_info: BTreeMap::new(),
-            concurrency: builder.concurrency,
+            concurrency: concurrency,
             signal_chan: signal,
-            force_quite_timeout: 10,
-            middlewares: vec![],
+            wg: wg,
+            middlewares: middlewares,
             // random itentity
             rs: rs,
         })
     }
 
-    pub fn start(&mut self) {
+    pub fn start(mut self) {
         info!("sidekiq-rs is running...");
         let signal = self.signal_chan.clone();
 
@@ -205,6 +213,10 @@ impl<'a> SidekiqServer<'a> {
                 },
             }
         }
+        let wg = self.wg.clone();
+        drop(self);
+        wg.wait();
+        info!("sidekiq-rs exited");
     }
 }
 
@@ -384,7 +396,7 @@ impl<'a> SidekiqServer<'a> {
 
 impl<'a> Drop for SidekiqServer<'a> {
     fn drop(&mut self) {
-        info!("sidekiq-rs exited");
+        info!("sidekiq-rs exiting");
     }
 }
 
