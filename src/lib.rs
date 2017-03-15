@@ -1,4 +1,3 @@
-#![feature(trace_macros,log_syntax)]
 #![recursion_limit="1024"]
 extern crate serde;
 #[macro_use]
