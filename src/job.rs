@@ -72,7 +72,7 @@ impl Deserialize for Job {
                     error_class <- JMapExt::<D>::remove_string(&mut obj, "error_class").ok();
                     error_backtrace <- JMapExt::<D>::remove_svec(&mut obj, "error_backtrace").ok();
                     failed_at <- JMapExt::<D>::remove_datetime(&mut obj, "failed_at").ok();
-                    retried_at <- Some(JMapExt::<D>::remove_datetime(&mut obj, "retried_at").ok());
+                    retried_at <- JMapExt::<D>::remove_datetime(&mut obj, "retried_at").ok();
 
                     Some(RetryInfo {
                         retry_count: retry_count,
@@ -149,11 +149,11 @@ impl Serialize for Job {
             let failed_at = retry_info.failed_at.timestamp() as f64 +
                             retry_info.failed_at.timestamp_subsec_nanos() as f64 / 1e9;
             map_serializer.serialize_entry("failed_at", &failed_at)?;
-            retry_info.retried_at.map(|retried_at| {
-                let retried_at = retried_at.timestamp() as f64 +
-                                 retried_at.timestamp_subsec_nanos() as f64 / 1e9;
-                map_serializer.serialize_entry("retried_at", &retried_at)
-            });
+
+            let retried_at = retry_info.retried_at.timestamp() as f64 +
+                             retry_info.retried_at.timestamp_subsec_nanos() as f64 / 1e9;
+            map_serializer.serialize_entry("retried_at", &retried_at)?;
+
             map_serializer.serialize_entry("retry_count", &retry_info.retry_count)?;
         }
         for (k, v) in &self.extra {
@@ -172,7 +172,7 @@ pub struct RetryInfo {
     pub error_class: String,
     pub error_backtrace: Vec<String>,
     pub failed_at: DateTime<UTC>,
-    pub retried_at: Option<DateTime<UTC>>,
+    pub retried_at: DateTime<UTC>,
 }
 
 trait JMapExt<D>

@@ -19,6 +19,10 @@ error_chain!{
             description("ZeroQueue")
             display("Server should have at least one queue to listen on")
         }
+        NoRetryInfo {
+            description("NoRetryInfo")
+            display("You should provide retry info to put the task back to retry")
+        }
         WorkerError(t: String) {
             description("Worker error")
             display("Worker Error '{}'", t)

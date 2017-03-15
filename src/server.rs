@@ -222,7 +222,7 @@ impl<'a> SidekiqServer<'a> {
 
 impl<'a> SidekiqServer<'a> {
     fn pack_job(&mut self, job: Job) -> BoxFuture<(), Error> {
-        let agent = JobAgent::new(job);
+        let agent = JobAgent::new(job, self.redis_pool.clone());
         let mut continuation: FutureJob = ok(agent.clone()).boxed();
 
         for middleware in &mut self.middlewares {
@@ -310,24 +310,48 @@ impl<'a> SidekiqServer<'a> {
 
 impl<'a> SidekiqServer<'a> {
     fn poll(&mut self) -> Result<Option<Job>> {
-        let mut choice = random_choice();
+        let conn = self.redis_pool.get()?;
 
-        let queue_name = {
-            let v = choice.random_choice_f64(&self.queues, &self.weights, 1);
-            v[0]
+        let payload = if let Some(retry) = conn.zrangebyscore_limit(self.with_namespace("retry"),
+                                 0,
+                                 UTC::now().timestamp(),
+                                 0,
+                                 1)? {
+            Some(retry)
+        } else if let Some(scheduled) =
+            conn.zrangebyscore_limit(self.with_namespace("schedule"),
+                                     0,
+                                     UTC::now().timestamp(),
+                                     0,
+                                     1)? {
+            Some(scheduled)
+        } else {
+
+            let mut choice = random_choice();
+
+            let queue_name = {
+                let v = choice.random_choice_f64(&self.queues, &self.weights, 1);
+                v[0]
+            };
+
+            debug!("Polling queue {} once", queue_name);
+
+            let modified_queue_name = self.queue_name(queue_name);
+
+
+            let result: Option<Vec<String>> =
+                self.redis_pool.get()?.brpop(&modified_queue_name, 2)?;
+
+            result.and_then(|mut v| {
+                assert_eq!(v.len() , 1);
+                v.pop()
+            })
         };
 
-        debug!("Polling queue {} once", queue_name);
 
-        let modified_queue_name = self.queue_name(queue_name);
 
-        let result: Option<Vec<String>> = self.redis_pool.get()?.brpop(&modified_queue_name, 2)?;
-
-        if let Some(result) = result {
-            let mut job: Job = from_str(&result[1])?;
-            if let Some(ref mut retry_info) = job.retry_info {
-                retry_info.retried_at = Some(UTC::now());
-            }
+        if let Some(result) = payload {
+            let mut job: Job = from_str(&result)?;
 
             job.namespace = self.namespace.clone();
 

@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
-use chrono::{UTC, DateTime};
+use chrono::{UTC, DateTime, Duration};
 use futures::{Future, IntoFuture};
 use futures::future::{ok, err};
 
@@ -59,7 +59,7 @@ impl MiddleWare for RetryMiddleware {
                                 })
                                 .unwrap_or(vec![]),
                             failed_at: UTC::now(),
-                            retried_at: None,
+                            retried_at: UTC::now() + Duration::minutes(1),
                         });
                         let result = job.put_back_retry();
 
