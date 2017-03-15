@@ -46,6 +46,10 @@ inform and wait workers to quit.
 
 Server will not accept anymore jobs if either signal received.
 
+# Caveat
+
+It's your responsibility to ensure no panics spread out inside your handler and middleware, the server will never catch the panic for you and will let it crash!
+
 ## TODO:
 
 - [x] Sidekiq dashboard capability.

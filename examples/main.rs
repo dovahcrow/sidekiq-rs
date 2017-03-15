@@ -27,7 +27,7 @@ struct Params {
 fn main() {
     env_logger::init().unwrap();
     let params = Params::from_args();
-
+    println!("params is {:?}", params);
     let queues: Vec<_> = params.queues
         .into_iter()
         .map(|v| {
@@ -44,7 +44,9 @@ fn main() {
         .job_handler("Error", ErrorHandler as fn(JobAgent) -> FutureJob)
         .job_handler("Panic", PanicHandler as fn())
         .middleware(RetryMiddleware)
-        .middleware(TimeElapseMiddleware::new());
+        .middleware(TimeElapseMiddleware::new())
+        .namespace(&params.namespace);
+
     for (name, weight) in queues {
         builder.queue(&name, weight);
     }
