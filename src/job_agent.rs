@@ -2,7 +2,8 @@ use std::ops::{Deref, DerefMut};
 use std::convert::Into;
 
 use serde_json::to_string;
-use redis::Commands;
+use redis::{Commands, Pipeline, PipelineCommands};
+use chrono::{UTC, Duration};
 
 use job::Job;
 use errors::Result;
@@ -43,6 +44,17 @@ impl JobAgent {
         let score = self.job.retry_info.as_ref().ok_or(NoRetryInfo)?.retried_at.timestamp();
 
         let _: () = conn.zadd(self.job.with_namespace("retry"), payload, score)?;
+        Ok(())
+    }
+
+    pub fn put_to_morgue(&self) -> Result<()> {
+        let conn = self.redis.get()?;
+        let payload = to_string(&self.job)?;
+        let score = self.job.retry_info.as_ref().ok_or(NoRetryInfo)?.retried_at.timestamp();
+        let _: () = Pipeline::new().zadd(self.job.with_namespace("dead"), payload, score)
+            .zrembyscore("dead", 0, (UTC::now() - Duration::days(30)).timestamp())
+            .zrembyrank("dead", 0, -10000)
+            .query(&*conn)?;
         Ok(())
     }
 }

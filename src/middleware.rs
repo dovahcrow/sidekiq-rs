@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 
 use chrono::{UTC, DateTime, Duration};
 use futures::{Future, IntoFuture};
-use futures::future::{ok, err};
+use futures::future::ok;
 
 use job_agent::JobAgent;
 use job::RetryInfo;
@@ -47,7 +47,12 @@ impl MiddleWare for RetryMiddleware {
                 let retry_count = job.retry_info.as_ref().map(|i| i.retry_count).unwrap_or(0);
                 match (&job.retry, usize::max_value()) {
                     (&Bool(true), u) | (&USize(u), _) if retry_count < u => {
-                        warn!("Job '{:?}' failed with '{}', retrying", job, e);
+                        warn!("Job '<{} retry.limit={} retry.count={}>' failed with '{}', \
+                               retrying",
+                              job.class,
+                              job.retry,
+                              retry_count,
+                              e);
                         job.retry_info = Some(RetryInfo {
                             retry_count: retry_count + 1,
                             error_message: format!("{}", e),
@@ -63,11 +68,23 @@ impl MiddleWare for RetryMiddleware {
                         });
                         let result = job.put_back_retry();
 
-                        result.map(|_| job.clone())
-                            .map_err(|e| (job, e))
+                        match result {
+                                Ok(_) => Ok(job),
+                                Err(e) => Err((job, e)),
+                            }
                             .into_future()
                     }
-                    _ => err((job, e)),
+                    _ => {
+                        // send to morgue
+                        warn!("Job <{}> retry count exceeded, put to dead job queue.",
+                              job.class);
+                        let result = job.put_to_morgue();
+                        match result {
+                                Ok(_) => Ok(job),
+                                Err(e) => Err((job, e)),
+                            }
+                            .into_future()
+                    }
                 }
             })
             .boxed()
@@ -99,7 +116,7 @@ impl MiddleWare for TimeElapseMiddleware {
     fn before(&mut self, continuation: FutureJob) -> FutureJob {
         let mut ego = self.clone();
         continuation.map(move |job| {
-                ego.record_start(&job.class);
+                ego.record_start(&job.jid);
                 job
             })
             .boxed()
@@ -110,9 +127,11 @@ impl MiddleWare for TimeElapseMiddleware {
     fn after(&mut self, continuation: FutureJob) -> FutureJob {
         let mut ego = self.clone();
         continuation.map(move |job| {
-                if let Some(that) = ego.record_end(&job.class) {
+                if let Some(that) = ego.record_end(&job.jid) {
                     let now = UTC::now();
-                    info!("'{:?}' takes {}", job, now.signed_duration_since(that));
+                    info!("'{:?}' takes {}",
+                          job.class,
+                          now.signed_duration_since(that));
                 }
                 job
             })

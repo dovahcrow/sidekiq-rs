@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 use std::iter::FromIterator;
-
+use std::fmt::{Result as FmtResult, Formatter, Display};
 use serde_json::{Value as JValue, Map as JMap};
 use serde::{Serialize, Deserialize, Serializer, Deserializer};
 use serde::de::Error;
@@ -8,10 +8,19 @@ use serde::ser::SerializeMap;
 
 use chrono::{DateTime, UTC, NaiveDateTime};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum BoolOrUSize {
     Bool(bool),
     USize(usize),
+}
+
+impl Display for BoolOrUSize {
+    fn fmt(&self, formatter: &mut Formatter) -> FmtResult {
+        match *self {
+            BoolOrUSize::Bool(b) => write!(formatter, "{}", b),
+            BoolOrUSize::USize(u) => write!(formatter, "{}", u),
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
