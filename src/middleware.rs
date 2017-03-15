@@ -112,7 +112,7 @@ impl MiddleWare for TimeElapseMiddleware {
         continuation.map(move |job| {
                 if let Some(that) = ego.record_end(&job.class) {
                     let now = UTC::now();
-                    info!("'{:?}' takes {}", job, that.signed_duration_since(now));
+                    info!("'{:?}' takes {}", job, now.signed_duration_since(that));
                 }
                 job
             })
