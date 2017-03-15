@@ -30,7 +30,7 @@ pub struct Job {
 }
 
 impl Job {
-    fn with_namespace(&self, snippet: &str) -> String {
+    pub fn with_namespace(&self, snippet: &str) -> String {
         if self.namespace == "" {
             snippet.into()
         } else {

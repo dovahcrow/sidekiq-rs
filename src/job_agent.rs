@@ -41,7 +41,8 @@ impl JobAgent {
         let conn = self.redis.get()?;
         let payload = to_string(&self.job)?;
         let score = self.job.retry_info.as_ref().ok_or(NoRetryInfo)?.retried_at.timestamp();
-        let _: () = conn.zadd(self.job.namespace.clone() + ":retry", payload, score)?;
+
+        let _: () = conn.zadd(self.job.with_namespace("retry"), payload, score)?;
         Ok(())
     }
 }

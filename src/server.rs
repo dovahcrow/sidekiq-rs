@@ -312,20 +312,37 @@ impl<'a> SidekiqServer<'a> {
     fn poll(&mut self) -> Result<Option<Job>> {
         let conn = self.redis_pool.get()?;
 
-        let payload = if let Some(retry) = conn.zrangebyscore_limit(self.with_namespace("retry"),
+        let mut payload = None;
+
+        if let Some(retry) = conn.zrangebyscore_limit(self.with_namespace("retry"),
                                  0,
                                  UTC::now().timestamp(),
                                  0,
                                  1)? {
-            Some(retry)
-        } else if let Some(scheduled) =
-            conn.zrangebyscore_limit(self.with_namespace("schedule"),
+            let mut retry: Vec<String> = retry;
+
+            if let Some(job) = retry.pop() {
+                let _: () = conn.zrem(self.with_namespace("retry"), &job)?;
+                payload = Some(job);
+            }
+        }
+
+
+        if payload.is_none() {
+            if let Some(scheduled) = conn.zrangebyscore_limit(self.with_namespace("schedule"),
                                      0,
                                      UTC::now().timestamp(),
                                      0,
                                      1)? {
-            Some(scheduled)
-        } else {
+                let mut scheduled: Vec<String> = scheduled;
+                if let Some(job) = scheduled.pop() {
+                    let _: () = conn.zrem(self.with_namespace("schedule"), &job)?;
+                    payload = Some(job)
+                }
+            }
+        }
+
+        if payload.is_none() {
 
             let mut choice = random_choice();
 
@@ -342,10 +359,10 @@ impl<'a> SidekiqServer<'a> {
             let result: Option<Vec<String>> =
                 self.redis_pool.get()?.brpop(&modified_queue_name, 2)?;
 
-            result.and_then(|mut v| {
-                assert_eq!(v.len() , 1);
+            payload = result.and_then(|mut v| {
+                assert_eq!(v.len() , 2); // the first is the key, second is the value
                 v.pop()
-            })
+            });
         };
 
 
@@ -360,7 +377,6 @@ impl<'a> SidekiqServer<'a> {
         } else {
             Ok(None)
         }
-
     }
 }
 
