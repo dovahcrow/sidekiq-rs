@@ -44,7 +44,7 @@ Server will not accept anymore jobs if receives either of the above signals.
 - [x] Support arbitrary fields in job object.
 - [x] Middleware support.
 - [x] Job retry support via middleware.
-- [x] Documentation.
+- [ ] Documentation.
 - [ ] Unique job support via middleware.
 - [ ] Ruby code handler
 - [ ] Regex handler matching.
